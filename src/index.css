@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-night-950: #07070d;
+  --color-night-900: #0b0b16;
+  --color-night-850: #10101e;
+  --color-night-800: #16162a;
+  --color-night-700: #1f1f3a;
+  --color-night-600: #2b2b4f;
+  --color-night-500: #4a4a78;
+  --color-night-400: #6d6da0;
+  --color-night-300: #9a9ac4;
+  --color-night-200: #c4c4e0;
+  --color-night-100: #d8d8ec;
+  --color-night-50: #eaeaf5;
+
+  --color-neon-cyan: #22d3ee;
+  --color-neon-magenta: #e879f9;
+  --color-neon-pink: #e879f9;
+  --color-neon-green: #4ade80;
+  --color-neon-amber: #fbbf24;
+  --color-neon-red: #fb7185;
+
+  --shadow-glow-cyan: 0 0 20px rgba(34, 211, 238, 0.45);
+  --shadow-glow-magenta: 0 0 20px rgba(232, 121, 249, 0.45);
+  --shadow-glow-green: 0 0 20px rgba(74, 222, 128, 0.45);
+  --shadow-glow-amber: 0 0 20px rgba(251, 191, 36, 0.45);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-night-950 text-night-200 font-display antialiased;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(34, 211, 238, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(232, 121, 249, 0.06), transparent);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.35);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-night-900);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-night-600);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-night-400);
+}
+
+/* ---------- Utilidades cyberpunk ---------- */
+
+@utility glow-cyan {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.35);
+}
+@utility glow-magenta {
+  box-shadow: 0 0 20px rgba(232, 121, 249, 0.35);
+}
+@utility glow-green {
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.35);
+}
+@utility glow-amber {
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.35);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.6);
+}
+.text-glow-magenta {
+  text-shadow: 0 0 12px rgba(232, 121, 249, 0.6);
+}
+.text-glow-green {
+  text-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+}
+.text-glow-amber {
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+}
+
+/* Fondo de rejilla cyberpunk */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Efecto scanline */
+.scanlines::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.18) 4px
+  );
+  border-radius: inherit;
+}
+
+/* Tarjeta neón con borde graduado */
+.neon-card {
+  @apply relative rounded-xl border border-night-700 bg-night-900/80 backdrop-blur;
+}
+.neon-card-cyan {
+  border-color: rgba(34, 211, 238, 0.35);
+}
+.neon-card-magenta {
+  border-color: rgba(232, 121, 249, 0.35);
+}
+.neon-card-green {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+.neon-card-amber {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+/* Título con marcador de código */
+.code-chip {
+  @apply inline-flex items-center gap-1.5 rounded-md border border-night-600 bg-night-800 px-2 py-0.5 font-mono text-xs text-neon-cyan;
+}
+
+/* Anillos para diagrama de flujo */
+.flow-node {
+  @apply rounded-lg border-2 font-mono text-xs text-center;
+}
+.flow-node:focus-visible {
+  outline: none;
+}
+
+/* Configuración del área de dibujo de React Flow */
+.react-flow__attribution {
+  background: transparent !important;
+  color: var(--color-night-400) !important;
+  font-size: 9px !important;
+}
+.react-flow__controls button {
+  background: var(--color-night-800) !important;
+  border-bottom: 1px solid var(--color-night-600) !important;
+  color: var(--color-night-200) !important;
+}
+.react-flow__controls button:hover {
+  background: var(--color-night-700) !important;
+}
+.react-flow__edge-path {
+  stroke: var(--color-neon-cyan);
+}
+.react-flow__connection-path {
+  stroke: var(--color-neon-magenta);
+}
+
+/* Editor CodeMirror en tema oscuro */
+.cm-editor {
+  @apply font-mono text-sm;
+  height: 100%;
+  background: transparent !important;
+}
+.cm-editor .cm-gutters {
+  background: var(--color-night-900) !important;
+  border-right: 1px solid var(--color-night-700) !important;
+  color: var(--color-night-400) !important;
+}
+.cm-editor .cm-activeLine,
+.cm-editor .cm-activeLineGutter {
+  background: rgba(34, 211, 238, 0.06) !important;
+}
+.cm-editor.cm-focused {
+  outline: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
