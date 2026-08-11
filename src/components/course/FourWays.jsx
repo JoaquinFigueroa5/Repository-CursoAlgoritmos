@@ -3,7 +3,7 @@ import { Languages, ListChecks, Workflow, Braces } from 'lucide-react'
 import { naturalDesdePrograma } from '../../engine/natural.js'
 import { pseudoDesdePrograma } from '../../engine/pseudocode.js'
 import { cppDesdePrograma } from '../../engine/cpp.js'
-import { flujoDesdePrograma } from '../../engine/flowchart.js'
+import { flujoDesdePrograma, altoDelFlujo } from '../../engine/flowchart.js'
 import CodeBlock from '../common/CodeBlock.jsx'
 import FlowCanvas from '../flow/FlowCanvas.jsx'
 
@@ -31,6 +31,10 @@ export default function FourWays({ programa: prog, defaultTab = 'natural', altoF
     flujo = null
   }
 
+  const altoFlujoFinal = flujo
+    ? Math.max(altoFlujo, Math.min(altoDelFlujo(flujo.nodes) + 90, 1100))
+    : altoFlujo
+
   return (
     <div className="rounded-2xl border border-night-700 bg-night-900/60">
       <div className="flex flex-wrap items-center gap-1 border-b border-night-700 p-1.5">
@@ -56,7 +60,7 @@ export default function FourWays({ programa: prog, defaultTab = 'natural', altoF
       <div className="p-3 sm:p-4">
         {tab === 'flujo' ? (
           flujo ? (
-            <FlowCanvas nodes={flujo.nodes} edges={flujo.edges} editable={false} minHeight={altoFlujo} />
+            <FlowCanvas nodes={flujo.nodes} edges={flujo.edges} editable={false} minHeight={altoFlujoFinal} />
           ) : (
             <p className="py-8 text-center text-sm text-night-400">No se pudo generar el diagrama.</p>
           )

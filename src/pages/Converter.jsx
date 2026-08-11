@@ -3,7 +3,7 @@ import { ArrowRightLeft, Languages, ListChecks, Workflow, Braces, Loader2, Trian
 import { naturalDesdePrograma, irDesdeNatural } from '../engine/natural.js'
 import { pseudoDesdePrograma, irDesdePseudo } from '../engine/pseudocode.js'
 import { cppDesdePrograma, irDesdeCPP } from '../engine/cpp.js'
-import { flujoDesdePrograma, programaDesdeFlujo, flujoEjemplo } from '../engine/flowchart.js'
+import { flujoDesdePrograma, programaDesdeFlujo, flujoEjemplo, altoDelFlujo } from '../engine/flowchart.js'
 import { unidadPorId } from '../data/units.js'
 import CmEditor, { NaturalEditor } from '../components/editors/Editors.jsx'
 import FlowEditor from '../components/flow/FlowEditor.jsx'
@@ -11,7 +11,7 @@ import FlowCanvas from '../components/flow/FlowCanvas.jsx'
 import CodeBlock from '../components/common/CodeBlock.jsx'
 
 function FlowCanvasSimple({ nodes, edges }) {
-  return <FlowCanvas nodes={nodes} edges={edges} editable={false} />
+  return <FlowCanvas nodes={nodes} edges={edges} editable={false} minHeight={Math.max(380, Math.min(altoDelFlujo(nodes) + 90, 1100))} />
 }
 
 const FUENTES = [
@@ -29,7 +29,7 @@ const EJEMPLO_INICIAL = {
 export default function Converter() {
   const [fuente, setFuente] = useState('natural')
   const [texto, setTexto] = useState(() => naturalDesdePrograma(EJEMPLO_INICIAL.programa))
-  const [flujo, setFlujo] = useState({ nodes: [], edges: [] })
+  const [flujo, setFlujo] = useState(() => flujoEjemplo())
   const [cargando, setCargando] = useState(false)
   const [resultado, setResultado] = useState(null)
 
@@ -116,6 +116,9 @@ export default function Converter() {
             <button
               key={f.id}
               onClick={() => {
+                if (f.id === 'flujo' && fuente !== 'flujo' && resultado?.ok && resultado.reps.flujo) {
+                  setFlujo(resultado.reps.flujo)
+                }
                 setFuente(f.id)
                 setResultado(null)
               }}
@@ -152,8 +155,8 @@ export default function Converter() {
         <NaturalEditor value={texto} onChange={setTexto} minRows={8} />
       ) : fuente === 'flujo' ? (
         <FlowEditor
-          initialNodes={flujoEjemplo().nodes}
-          initialEdges={flujoEjemplo().edges}
+          nodes={flujo.nodes}
+          edges={flujo.edges}
           onCambio={(n, e) => setFlujo({ nodes: n, edges: e })}
         />
       ) : (
@@ -165,7 +168,7 @@ export default function Converter() {
         <button
           onClick={convert}
           disabled={cargando}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-neon-cyan to-fuchsia-500 px-8 py-3 text-sm font-black text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.35)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.55)] disabled:cursor-wait disabled:opacity-60"
+          className="flex items-center gap-2 rounded-xl bg-linear-to-b from-neon-cyan to-fuchsia-500 px-8 py-3 text-sm font-black text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.35)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.55)] disabled:cursor-wait disabled:opacity-60"
         >
           {cargando ? <Loader2 size={16} className="animate-spin" /> : <ArrowRightLeft size={16} />}
           Convertir

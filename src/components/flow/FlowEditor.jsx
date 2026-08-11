@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   CircleDot,
   Square,
@@ -36,83 +36,82 @@ const ETIQUETA_POR_TIPO = {
   decision: 'a > 0',
 }
 
-export default function FlowEditor({ initialNodes, initialEdges, onCambio, alto = 460 }) {
-  const [nodes, setNodes] = useState(() => initialNodes.map((n) => ({ ...n, data: { ...n.data, onGuardar: guardarEtiqueta } })))
-  const [edges, setEdges] = useState(initialEdges)
+export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
   const [sel, setSel] = useState(null)
 
+  const nodesConGuardar = nodes.map((n) => ({
+    ...n,
+    data: { ...n.data, onGuardar: guardarEtiqueta },
+  }))
+
   function guardarEtiqueta(id, valor) {
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label: valor, editando: false } } : n)))
+    const next = nodes.map((n) =>
+      n.id === id ? { ...n, data: { ...n.data, label: valor, editando: false } } : n,
+    )
+    onCambio(next, edges)
   }
 
   const onNodesChange = (cambios) => {
-    setNodes((nds) => {
-      const next = applyNodeChanges(cambios, nds)
-      for (const c of cambios) {
-        if (c.type === 'select') {
-          if (!c.selected) setSel((s) => (s && s.tipo === 'nodo' && s.id === c.id ? null : s))
-        }
+    const next = applyNodeChanges(cambios, nodes)
+    for (const c of cambios) {
+      if (c.type === 'select' && !c.selected) {
+        setSel((s) => (s && s.tipo === 'nodo' && s.id === c.id ? null : s))
       }
-      return next
-    })
+    }
+    onCambio(next, edges)
   }
 
   const onEdgesChange = (cambios) => {
-    setEdges((eds) => {
-      const next = applyEdgeChanges(cambios, eds)
-      for (const c of cambios) {
-        if (c.type === 'select') {
-          if (c.selected) setSel({ tipo: 'arista', id: c.id })
-          else setSel((s) => (s && s.tipo === 'arista' && s.id === c.id ? null : s))
-        }
+    const next = applyEdgeChanges(cambios, edges)
+    for (const c of cambios) {
+      if (c.type === 'select') {
+        if (c.selected) setSel({ tipo: 'arista', id: c.id })
+        else setSel((s) => (s && s.tipo === 'arista' && s.id === c.id ? null : s))
       }
-      return next
-    })
+    }
+    onCambio(nodes, next)
   }
 
   const onConnect = (params) => {
     const origen = nodes.find((n) => n.id === params.source)
-    setEdges((eds) =>
+    onCambio(
+      nodes,
       addEdge(
         { ...params, label: origen?.type === 'decision' ? 'Sí' : undefined },
-        eds,
+        edges,
       ),
     )
   }
 
   const onNodeDoubleClick = (_, nodo) => {
-    setNodes((nds) => nds.map((n) => (n.id === nodo.id ? { ...n, data: { ...n.data, editando: true } } : n)))
+    onCambio(
+      nodes.map((n) => (n.id === nodo.id ? { ...n, data: { ...n.data, editando: true } } : n)),
+      edges,
+    )
   }
 
   const agregar = (tipo) => {
     const id = nid()
     const size = NODE_SIZES[tipo] ?? { w: 160, h: 60 }
     const pos = { x: 120 + (nodes.length % 3) * 60, y: 60 + Math.floor(nodes.length / 3) * 40 }
-    setNodes((nds) => [
-      ...nds,
-      {
-        id,
-        type: tipo,
-        position: pos,
-        data: { label: ETIQUETA_POR_TIPO[tipo], size, tipo, onGuardar: guardarEtiqueta },
-        sourcePosition: 'bottom',
-        targetPosition: 'top',
-      },
-    ])
+    onCambio(
+      [
+        ...nodes,
+        {
+          id,
+          type: tipo,
+          position: pos,
+          data: { label: ETIQUETA_POR_TIPO[tipo], size, tipo },
+          sourcePosition: 'bottom',
+          targetPosition: 'top',
+        },
+      ],
+      edges,
+    )
     setSel({ tipo: 'nodo', id })
   }
 
-  const aristaSel = useMemo(
-    () => (sel && sel.tipo === 'arista' ? edges.find((e) => e.id === sel.id) : null),
-    [sel, edges],
-  )
-
-  const refCambio = useRef(onCambio)
-  refCambio.current = onCambio
-
-  useEffect(() => {
-    refCambio.current?.(nodes, edges)
-  }, [nodes, edges])
+  const aristaSel = sel && sel.tipo === 'arista' ? edges.find((e) => e.id === sel.id) : null
 
   return (
     <div className="space-y-3">
@@ -136,7 +135,7 @@ export default function FlowEditor({ initialNodes, initialEdges, onCambio, alto 
       </div>
 
       <FlowCanvas
-        nodes={nodes}
+        nodes={nodesConGuardar}
         edges={edges}
         editable
         onNodesChange={onNodesChange}
@@ -161,7 +160,10 @@ export default function FlowEditor({ initialNodes, initialEdges, onCambio, alto 
           <input
             value={aristaSel.label ?? ''}
             onChange={(e) =>
-              setEdges((eds) => eds.map((ed) => (ed.id === aristaSel.id ? { ...ed, label: e.target.value } : ed)))
+              onCambio(
+                nodes,
+                edges.map((ed) => (ed.id === aristaSel.id ? { ...ed, label: e.target.value } : ed)),
+              )
             }
             className="w-full rounded-lg border border-night-700 bg-night-950 px-3 py-2 font-mono text-sm text-night-100 outline-none focus:border-neon-cyan/50"
             placeholder="Sí / No / vacío"

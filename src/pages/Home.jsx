@@ -70,12 +70,12 @@ export default function Home() {
           <div className="hero-titulo">
             <span className="inline-flex items-center gap-2 rounded-full border border-neon-cyan/40 bg-neon-cyan/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.25em] text-neon-cyan">
               <Sparkles size={13} />
-              Curso de Algoritmos
+              Curso de AlgoritmosUMG
             </span>
             <h1 className="mt-6 text-4xl font-black leading-tight text-night-50 sm:text-6xl">
               Un mismo algoritmo,
               <br />
-              <span className="bg-gradient-to-r from-neon-cyan via-fuchsia-400 to-neon-amber bg-clip-text text-transparent">
+              <span className="bg-linear-to-b from-neon-cyan via-fuchsia-400 to-neon-amber bg-clip-text text-transparent">
                 cuatro formas de decirlo
               </span>
             </h1>
@@ -170,7 +170,7 @@ export default function Home() {
               },
             ].map((paso) => (
               <div key={paso.n} className="rounded-2xl border border-night-700 bg-night-900/50 p-6">
-                <span className="bg-gradient-to-r from-neon-cyan to-fuchsia-500 bg-clip-text text-4xl font-black text-transparent">
+                <span className="bg-linear-to-b from-neon-cyan to-fuchsia-500 bg-clip-text text-4xl font-black text-transparent">
                   {paso.n}
                 </span>
                 <h3 className="mt-3 font-bold text-night-50">{paso.t}</h3>

@@ -30,7 +30,7 @@ function makeNode(id, x, y, type, label, extra = {}) {
     id,
     type,
     position: { x: x - size.w / 2, y },
-    data: { label, size },
+    data: { label, size, tipo: type },
     sourcePosition: 'bottom',
     targetPosition: 'top',
     ...extra,
@@ -45,6 +45,13 @@ export function flujoDesdePrograma(program) {
   idC = 0
   const { nodes, edges } = layoutSecuencia(program.pasos, 400, 0)
   return { nodes, edges }
+}
+
+export function altoDelFlujo(nodes) {
+  if (!nodes.length) return 0
+  const maxY = Math.max(...nodes.map((n) => n.position.y + (n.data.size?.h ?? 64)))
+  const minY = Math.min(...nodes.map((n) => n.position.y))
+  return maxY - minY
 }
 
 function layoutSecuencia(pasos, x0, y0) {

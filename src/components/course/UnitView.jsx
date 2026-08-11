@@ -50,7 +50,7 @@ export default function UnitView() {
     <div className="pb-20">
       {/* encabezado */}
       <header
-        className={`relative overflow-hidden border-b border-night-800 bg-gradient-to-b ${unidad.color === 'cyan' ? 'from-neon-cyan/15' : unidad.color === 'magenta' ? 'from-neon-pink/15' : unidad.color === 'green' ? 'from-neon-green/15' : 'from-neon-amber/15'} to-night-950`}
+        className={`relative overflow-hidden border-b border-night-800 bg-linear-to-b ${unidad.color === 'cyan' ? 'from-neon-cyan/15' : unidad.color === 'magenta' ? 'from-neon-pink/15' : unidad.color === 'green' ? 'from-neon-green/15' : 'from-neon-amber/15'} to-night-950`}
       >
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-neon-cyan/10 blur-3xl" />
         <div className="relative mx-auto max-w-4xl px-4 py-12 sm:px-6">

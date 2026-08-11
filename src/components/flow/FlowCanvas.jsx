@@ -66,7 +66,7 @@ export default function FlowCanvas({
   return (
     <div
       className="relative overflow-hidden rounded-xl border border-night-700 bg-[#08080f]"
-      style={{ minHeight }}
+      style={{ height: minHeight, width: '100%' }}
     >
       <ReactFlow
         nodes={nodes}
@@ -80,7 +80,7 @@ export default function FlowCanvas({
         nodesDraggable={editable}
         nodesConnectable={editable}
         elementsSelectable
-        minZoom={0.25}
+        minZoom={0.1}
         maxZoom={2}
         fitView={fitView}
         fitViewOptions={{ padding: 0.25 }}
@@ -88,7 +88,7 @@ export default function FlowCanvas({
         colorMode="dark"
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="#1b2331" />
-        <Controls showInteractive={false} className="!bg-night-900 !border !border-night-700" />
+        <Controls showInteractive={false} className="bg-night-900! border! border-night-700!" />
       </ReactFlow>
     </div>
   )

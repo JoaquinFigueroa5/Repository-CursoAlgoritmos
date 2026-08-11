@@ -1,12 +1,13 @@
 import { NavLink, Link, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { Code2, Cpu, Home, ArrowRightLeft, PenTool } from 'lucide-react'
+import { Code2, Cpu, Home, ArrowRightLeft, PenTool, Terminal } from 'lucide-react'
 import { units } from '../data/units.js'
 
 const NAV = [
   { to: '/', label: 'Inicio', icono: Home },
   { to: '/convertidor', label: 'Convertidor', icono: ArrowRightLeft },
   { to: '/practica', label: 'Práctica', icono: PenTool },
+  { to: '/laboratorio', label: 'Laboratorio', icono: Terminal },
 ]
 
 export default function Layout({ children }) {
@@ -23,11 +24,11 @@ export default function Layout({ children }) {
       <header className="sticky top-0 z-40 border-b border-night-800 bg-night-950/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-neon-cyan to-fuchsia-500">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-b from-neon-cyan to-fuchsia-500">
               <Cpu size={17} className="text-night-950" />
             </span>
             <span className="text-sm font-black tracking-tight text-night-50">
-              Algoritmos<span className="text-neon-cyan">·</span>Lab
+              AlgoritmosUMG<span className="text-neon-cyan">·</span>Lab
             </span>
           </Link>
 
@@ -130,10 +131,10 @@ export default function Layout({ children }) {
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 py-10 text-center sm:px-6">
           <div className="flex items-center gap-2">
             <Code2 size={16} className="text-neon-cyan" />
-            <span className="text-sm font-bold text-night-200">Algoritmos·Lab</span>
+            <span className="text-sm font-bold text-night-200">AlgoritmosUMG·Lab</span>
           </div>
           <p className="max-w-md text-xs leading-5 text-night-500">
-            Un curso interactivo para aprender algoritmos con 4 representaciones: lenguaje natural,
+            Un curso interactivo para aprender algoritmos del curso "Algoritmos" de Ingenieria en sistemas de la Universidad Mariano Galvez con 4 representaciones: lenguaje natural,
             pseudocódigo, diagrama de flujo y C++.
           </p>
         </div>

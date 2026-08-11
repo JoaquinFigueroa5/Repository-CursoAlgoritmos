@@ -49,6 +49,14 @@ const MODOS = [
   { id: 'cpp', label: 'C++', icono: Braces, color: 'text-neon-cyan' },
 ]
 
+const FLUJO_INICIAL = {
+  nodes: [
+    { id: 'n1', type: 'inicio', position: { x: 250, y: 0 }, data: { label: 'Inicio', size: { w: 130, h: 58 }, tipo: 'inicio' } },
+    { id: 'n2', type: 'fin', position: { x: 250, y: 300 }, data: { label: 'Fin', size: { w: 130, h: 58 }, tipo: 'fin' } },
+  ],
+  edges: [],
+}
+
 function contarTipo(pasos, tipo) {
   let n = 0
   for (const p of pasos) {
@@ -67,7 +75,7 @@ export default function Practice() {
   const [idx, setIdx] = useState(0)
   const [modo, setModo] = useState('pseudo')
   const [texto, setTexto] = useState('')
-  const [flujo, setFlujo] = useState({ nodes: [], edges: [] })
+  const [flujo, setFlujo] = useState(FLUJO_INICIAL)
   const [resultado, setResultado] = useState(null)
   const [verSolucion, setVerSolucion] = useState(false)
   const ejercicio = EJERCICIOS[idx]
@@ -147,6 +155,7 @@ export default function Practice() {
               setResultado(null)
               setVerSolucion(false)
               setTexto('')
+              setFlujo(FLUJO_INICIAL)
             }}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
               i === idx
@@ -206,11 +215,8 @@ export default function Practice() {
         <NaturalEditor value={texto} onChange={setTexto} minRows={8} />
       ) : modo === 'flujo' ? (
         <FlowEditor
-          initialNodes={[
-            { id: 'n1', type: 'inicio', position: { x: 250, y: 0 }, data: { label: 'Inicio', size: { w: 130, h: 58 }, tipo: 'inicio' } },
-            { id: 'n2', type: 'fin', position: { x: 250, y: 300 }, data: { label: 'Fin', size: { w: 130, h: 58 }, tipo: 'fin' } },
-          ]}
-          initialEdges={[]}
+          nodes={flujo.nodes}
+          edges={flujo.edges}
           onCambio={(n, e) => setFlujo({ nodes: n, edges: e })}
         />
       ) : (
@@ -221,7 +227,7 @@ export default function Practice() {
       <div className="mt-5 flex items-center gap-3">
         <button
           onClick={validar}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-neon-cyan to-fuchsia-500 px-8 py-3 text-sm font-black text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.3)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.5)]"
+          className="flex items-center gap-2 rounded-xl bg-linear-to-b from-neon-cyan to-fuchsia-500 px-8 py-3 text-sm font-black text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.3)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.5)]"
         >
           <Check size={16} />
           Validar solución

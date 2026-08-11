@@ -14,10 +14,11 @@ const ESTILOS = {
   decision: { border: 'border-neon-cyan', bg: 'bg-neon-cyan/10', text: 'text-neon-cyan' },
 }
 
-function Formas({ data, id, selected }) {
+function Formas({ data, id, selected, type }) {
   const [texto, setTexto] = useState(data.label ?? '')
+  const tipo = data.tipo ?? type
   const size = data.size ?? { w: 160, h: 60 }
-  const est = ESTILOS[data.tipo] ?? ESTILOS.proceso
+  const est = ESTILOS[tipo] ?? ESTILOS.proceso
   const s = { width: size.w, height: size.h }
   const brillo = selected ? 'shadow-[0_0_0_2px_rgba(34,211,238,0.6)]' : ''
 
@@ -43,7 +44,7 @@ function Formas({ data, id, selected }) {
 
   return (
     <div className="relative" style={s}>
-      <Handle type="target" position={Position.Top} className="!h-2.5 !w-2.5 !border-2 !border-night-950 !bg-night-400" />
+      <Handle type="target" position={Position.Top} className="h-2.5! w-2.5! border-2! border-night-950! bg-night-400!" />
       {data.tipo === 'inicio' && (
         <div className={cx('flex h-full w-full items-center justify-center rounded-full border-2', est.border, est.bg, brillo)}>
           {data.editando ? input : <span className={cx('font-mono text-xs font-semibold', est.text)}>{data.label}</span>}
@@ -60,23 +61,26 @@ function Formas({ data, id, selected }) {
         </div>
       )}
       {(data.tipo === 'entrada' || data.tipo === 'salida') && (
-        <div className={cx('flex h-full w-full items-center justify-center rounded-md border-2 [transform:skewX(-12deg)]', est.border, est.bg, brillo)}>
+        <div className={cx('flex h-full w-full items-center justify-center rounded-md border-2 transform-[skewX(-12deg)]', est.border, est.bg, brillo)}>
           {data.editando ? (
-            <span className="px-2 [transform:skewX(12deg)]">{input}</span>
+            <span className="px-2 transform-[skewX(12deg)]">{input}</span>
           ) : (
-            <span className={cx('px-2 text-center font-mono text-xs leading-4 [transform:skewX(12deg)]', est.text)}>{data.label}</span>
+            <span className={cx('px-2 text-center font-mono text-xs leading-4 transform-[skewX(12deg)]', est.text)}>{data.label}</span>
           )}
         </div>
       )}
       {data.tipo === 'decision' && (
         <div className="flex h-full w-full items-center justify-center">
-          <div className={cx('absolute inset-0 rotate-45 rounded-sm border-2', est.border, est.bg, brillo)} />
+          <div
+            className={cx('absolute inset-0 border-2', est.border, est.bg, brillo)}
+            style={{ clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)' }}
+          />
           <span className={cx('relative z-10 px-5 text-center font-mono text-xs leading-4', est.text)}>
             {data.editando ? input : data.label}
           </span>
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="!h-2.5 !w-2.5 !border-2 !border-night-950 !bg-neon-cyan" />
+      <Handle type="source" position={Position.Bottom} className="h-2.5! w-2.5! border-2! border-night-950! bg-neon-cyan!" />
     </div>
   )
 }
