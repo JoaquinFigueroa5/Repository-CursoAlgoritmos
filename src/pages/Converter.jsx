@@ -32,10 +32,51 @@ export default function Converter() {
   const [flujo, setFlujo] = useState(() => flujoEjemplo())
   const [cargando, setCargando] = useState(false)
   const [resultado, setResultado] = useState(null)
+  const [ejemploSel, setEjemploSel] = useState('')
 
   const cargarEjemplo = (ej) => {
-    setTexto(naturalDesdePrograma(ej.programa))
-    setFlujo(flujoDesdePrograma(ej.programa))
+    if (fuente === 'flujo') {
+      setFlujo(flujoDesdePrograma(ej.programa))
+    } else {
+      setTexto(
+        fuente === 'natural'
+          ? naturalDesdePrograma(ej.programa)
+          : fuente === 'pseudo'
+            ? pseudoDesdePrograma(ej.programa)
+            : cppDesdePrograma(ej.programa),
+      )
+    }
+    setResultado(null)
+  }
+
+  const cambiarFuente = (destino) => {
+    if (destino === fuente) return
+    let ir = null
+    let error = null
+    if (fuente === 'flujo') {
+      const r = programaDesdeFlujo(flujo.nodes, flujo.edges)
+      if (!r.ok) error = r.error
+      else ir = r.programa
+    } else {
+      const r =
+        fuente === 'natural' ? irDesdeNatural(texto) : fuente === 'pseudo' ? irDesdePseudo(texto) : irDesdeCPP(texto)
+      if (!r.ok) error = r.error
+      else ir = r.programa
+    }
+    if (error) {
+      setResultado({ ok: false, error })
+      return
+    }
+    if (destino === 'flujo') {
+      setFlujo(flujoDesdePrograma(ir))
+    } else if (destino === 'natural') {
+      setTexto(naturalDesdePrograma(ir))
+    } else if (destino === 'pseudo') {
+      setTexto(pseudoDesdePrograma(ir))
+    } else {
+      setTexto(cppDesdePrograma(ir))
+    }
+    setFuente(destino)
     setResultado(null)
   }
 
@@ -91,7 +132,7 @@ export default function Converter() {
 
   const ejemplos = [
     { label: 'Hola mundo', programa: unidadPorId('unidad-1').ejemplos[0].programa },
-    { label: 'Suma de dos números', programa: unidadPorId('unidad-2').ejemplos[1].programa },
+    { label: 'Suma de dos números', programa: unidadPorId('unidad-2').ejemplos[0].programa },
     { label: 'Positivo o negativo', programa: EJEMPLO_INICIAL.programa },
     { label: 'Contar del 1 al 10', programa: unidadPorId('unidad-4').ejemplos[0].programa },
     { label: 'Suma los primeros N', programa: unidadPorId('unidad-4').ejemplos[3].programa },
@@ -115,13 +156,7 @@ export default function Converter() {
           return (
             <button
               key={f.id}
-              onClick={() => {
-                if (f.id === 'flujo' && fuente !== 'flujo' && resultado?.ok && resultado.reps.flujo) {
-                  setFlujo(resultado.reps.flujo)
-                }
-                setFuente(f.id)
-                setResultado(null)
-              }}
+              onClick={() => cambiarFuente(f.id)}
               className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
                 activo
                   ? 'border-neon-cyan/60 bg-neon-cyan/10 text-neon-cyan'
@@ -135,9 +170,12 @@ export default function Converter() {
         })}
         <span className="mx-1 hidden text-night-600 sm:block">|</span>
         <select
-          onChange={(e) => cargarEjemplo(ejemplos[e.target.value])}
+          value={ejemploSel}
+          onChange={(e) => {
+            cargarEjemplo(ejemplos[e.target.value])
+            setEjemploSel('')
+          }}
           className="rounded-xl border border-night-700 bg-night-900 px-3 py-2 text-sm text-night-300 outline-none focus:border-neon-cyan/50"
-          defaultValue=""
         >
           <option value="" disabled>
             Cargar ejemplo…

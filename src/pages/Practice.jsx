@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Check, X, Eye, Languages, ListChecks, Workflow, Braces, Lightbulb } from 'lucide-react'
-import { irDesdeNatural } from '../engine/natural.js'
-import { irDesdePseudo } from '../engine/pseudocode.js'
-import { irDesdeCPP } from '../engine/cpp.js'
-import { programaDesdeFlujo } from '../engine/flowchart.js'
+import { irDesdeNatural, naturalDesdePrograma } from '../engine/natural.js'
+import { irDesdePseudo, pseudoDesdePrograma } from '../engine/pseudocode.js'
+import { irDesdeCPP, cppDesdePrograma } from '../engine/cpp.js'
+import { programaDesdeFlujo, flujoDesdePrograma } from '../engine/flowchart.js'
 import CmEditor, { NaturalEditor } from '../components/editors/Editors.jsx'
 import FlowEditor from '../components/flow/FlowEditor.jsx'
 import FourWays from '../components/course/FourWays.jsx'
@@ -81,6 +81,32 @@ export default function Practice() {
   const ejercicio = EJERCICIOS[idx]
 
   const usarModo = (m) => {
+    if (m === modo) return
+    let ir = null
+    let error = null
+    if (modo === 'flujo') {
+      const r = programaDesdeFlujo(flujo.nodes, flujo.edges)
+      if (!r.ok) error = r.error
+      else ir = r.programa
+    } else {
+      const r =
+        modo === 'natural' ? irDesdeNatural(texto) : modo === 'pseudo' ? irDesdePseudo(texto) : irDesdeCPP(texto)
+      if (!r.ok) error = r.error
+      else ir = r.programa
+    }
+    if (error) {
+      setResultado({ ok: false, error })
+      return
+    }
+    if (m === 'flujo') {
+      setFlujo(flujoDesdePrograma(ir))
+    } else if (m === 'natural') {
+      setTexto(naturalDesdePrograma(ir))
+    } else if (m === 'pseudo') {
+      setTexto(pseudoDesdePrograma(ir))
+    } else {
+      setTexto(cppDesdePrograma(ir))
+    }
     setModo(m)
     setResultado(null)
   }
