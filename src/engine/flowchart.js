@@ -166,13 +166,33 @@ function layoutSi(paso, x0, y0) {
   }
 }
 
+// Normaliza la inicialización de un "para" para el diagrama: quita el
+// prefijo de tipo ("int i = 1" -> "i = 1") para que el nodo sea reconocible
+// como asignación y el ciclo se detecte de vuelta como "para".
+function clausulaParaInicio(texto) {
+  const t = (texto ?? '').trim()
+  const m = /^(?:[A-Za-z_][A-Za-z0-9_]*\s+)(\w+\s*=.*)$/.exec(t)
+  return m ? m[1] : t
+}
+
+// Normaliza la actualización de un "para" para el diagrama: expande ++, -- y
+// los operadores compuestos a una asignación explícita ("i++" -> "i = i + 1").
+function clausulaParaAvance(texto) {
+  const t = (texto ?? '').trim()
+  let m = /^(\w+)\s*(\+\+|--)\s*$/.exec(t)
+  if (m) return `${m[1]} = ${m[1]} ${m[2] === '++' ? '+' : '-'} 1`
+  m = /^(\w+)\s*(\+=|-=|\*=|\/=|%=)\s*(.+)$/.exec(t)
+  if (m) return `${m[1]} = ${m[1]} ${m[2][0]} ${m[3].trim()}`
+  return t
+}
+
 function layoutPara(paso, x0, y0) {
   const iId = nid()
   const dId = nid()
   const pH = NODE_SIZES.proceso.h
   const dH = NODE_SIZES.decision.h
   const nodes = [
-    makeNode(iId, x0, y0, 'proceso', paso.inicializacion),
+    makeNode(iId, x0, y0, 'proceso', clausulaParaInicio(paso.inicializacion)),
     makeNode(dId, x0, y0 + pH + GAP_V, 'decision', paso.condicion),
   ]
   const edges = [{ id: eid(), source: iId, target: dId }]
@@ -194,7 +214,7 @@ function layoutPara(paso, x0, y0) {
   }
   const uY = bodyY + (Lbody?.h ?? 0) + GAP_V
   const uId = nid()
-  nodes.push(makeNode(uId, x0 + (Lbody ? GAP_LOOP : 0), uY, 'proceso', paso.actualizacion))
+  nodes.push(makeNode(uId, x0 + (Lbody ? GAP_LOOP : 0), uY, 'proceso', clausulaParaAvance(paso.actualizacion)))
   if (Lbody) {
     for (const ex of Lbody.exits) {
       edges.push({ id: eid(), source: ex.id, target: uId })

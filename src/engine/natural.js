@@ -146,31 +146,80 @@ function siNatural(paso, nivel, sangria) {
 }
 
 function paraNatural(paso, nivel, sangria) {
-  const simple = formaParaSimple(paso)
-  const encabezado = simple
-    ? `Repetir para ${simple.nombre} desde ${simple.desde} hasta ${simple.hasta}${simple.movimiento}`
-    : `Repetir para (${paso.inicializacion}; ${paso.condicion}; ${paso.actualizacion})`
+  const encabezado = encabezadoParaNatural(paso)
   const lineas = [`${sangria}${encabezado}:`]
   lineas.push(...naturalDesdePasos(paso.cuerpo, nivel + 1))
   lineas.push(`${sangria}Fin de la repetición.`)
   return lineas
 }
 
-function formaParaSimple(paso) {
-  const mInit = /^(\w+)\s*=\s*(.+)$/.exec(paso.inicializacion)
-  const mCond = /^(\w+)\s*(<=|>=)\s*(.+)$/.exec(paso.condicion)
-  const mUpd = /^(\w+)\s*=\s*\1\s*(?:\+|-)\s*(.+)$/.exec(paso.actualizacion)
-  if (mInit && mCond && mUpd && mInit[1] === mCond[1] && mCond[1] === mUpd[1]) {
-    const desc = mCond[2] === '>='
-    const pasoVal = mUpd[2].trim()
-    const movimiento = desc
-      ? ` retrocediendo de ${pasoVal}`
-      : pasoVal === '1'
-        ? ''
-        : ` avanzando de ${pasoVal}`
-    return { nombre: mInit[1], desde: mInit[2].trim(), hasta: mCond[3].trim(), movimiento }
-  }
+// Describe el avance de un ciclo "para": { signo: '+'|'-', valor } o null.
+// Reconoce variable++, variable--, +=, -=, y = variable +/- N.
+function avanceDesdeActualizacion(nombre, actualizacion) {
+  const s = (actualizacion ?? '').trim()
+  const re = (patron) => new RegExp(`^${nombre}${patron}$`).exec(s)
+  let m = re(`\\s*\\+\\+`)
+  if (m) return { signo: '+', valor: '1' }
+  m = re(`\\s*--`)
+  if (m) return { signo: '-', valor: '1' }
+  m = re(`\\s*\\+=\\s*(.+)`)
+  if (m) return { signo: '+', valor: m[1].trim() }
+  m = re(`\\s*-=\\s*(.+)`)
+  if (m) return { signo: '-', valor: m[1].trim() }
+  m = re(`\\s*=\\s*${nombre}\\s*\\+\\s*(.+)`)
+  if (m) return { signo: '+', valor: m[1].trim() }
+  m = re(`\\s*=\\s*${nombre}\\s*-\\s*(.+)`)
+  if (m) return { signo: '-', valor: m[1].trim() }
   return null
+}
+
+// Reduce un "para" a contador simple si su inicialización, condición y
+// actualización son reconocibles. Acepta tipo en la inicialización
+// (int i = 1), cualquier comparador y ++/--/+=/-=/= var +/- N.
+function paraSimple(paso) {
+  const mInit = /^(?:[A-Za-z_][A-Za-z0-9_]*\s+)?(\w+)\s*=\s*(.+)$/.exec((paso.inicializacion ?? '').trim())
+  const mCond = /^(\w+)\s*(<=|>=|<|>|==|!=)\s*(.+)$/.exec((paso.condicion ?? '').trim())
+  if (!mInit || !mCond || mInit[1] !== mCond[1]) return null
+  const avance = avanceDesdeActualizacion(mInit[1], paso.actualizacion)
+  if (!avance) return null
+  return {
+    nombre: mInit[1],
+    desde: mInit[2].trim(),
+    operador: mCond[2],
+    limite: mCond[3].trim(),
+    ...avance,
+  }
+}
+
+// Frase de movimiento: '' (avance de 1), " avanzando de 2", " retrocediendo de 1".
+function fraseMovimiento(avance) {
+  if (avance.signo === '-') return ` retrocediendo de ${exprNatural(avance.valor)}`
+  return avance.valor === '1' ? '' : ` avanzando de ${exprNatural(avance.valor)}`
+}
+
+// Encabezado natural de un ciclo "para". Nunca emite "(init; cond; upd)".
+function encabezadoParaNatural(paso) {
+  const simple = paraSimple(paso)
+  if (simple) {
+    if (simple.operador === '<=' || simple.operador === '>=') {
+      return `Repetir para ${simple.nombre} desde ${exprNatural(simple.desde)} hasta ${exprNatural(simple.limite)}${fraseMovimiento(simple)}`
+    }
+    const cond = condicionNatural(`${simple.nombre} ${simple.operador} ${simple.limite}`, 'sea')
+    return `Repetir para ${simple.nombre} desde ${exprNatural(simple.desde)} mientras ${cond}${fraseMovimiento(simple)}`
+  }
+
+  // Fallback natural para casos atípicos: conserva variable/condición cuando
+  // se pueden identificar y, si no, expresa la repetición condicionalmente.
+  const mInit = /^(?:[A-Za-z_][A-Za-z0-9_]*\s+)?(\w+)\s*=\s*(.+)$/.exec((paso.inicializacion ?? '').trim())
+  const mCond = /^(\w+)\s*(<=|>=|<|>|==|!=)\s*(.+)$/.exec((paso.condicion ?? '').trim())
+  if (mInit && mCond && mInit[1] === mCond[1]) {
+    const cond = condicionNatural(`${mCond[1]} ${mCond[2]} ${mCond[3]}`, 'sea')
+    return `Repetir para ${mInit[1]} desde ${exprNatural(mInit[2].trim())} mientras ${cond}`
+  }
+  if (mCond) {
+    return `Repetir mientras ${condicionNatural(`${mCond[1]} ${mCond[2]} ${mCond[3]}`, 'sea')}`
+  }
+  return `Repetir mientras ${condicionNatural(paso.condicion ?? '', 'sea')}`
 }
 
 function mientrasNatural(paso, nivel, sangria) {
@@ -522,9 +571,28 @@ function parseRepetirPara(linea) {
     const pasoVal = (desc ? retrocediendo : avanzando) || '1'
     return (cuerpo) => ({
       type: 'para',
-      inicializacion: `${nombre} = ${inicio.trim()}`,
-      condicion: `${nombre} ${desc ? '>=' : '<='} ${fin.trim()}`,
-      actualizacion: `${nombre} = ${nombre} ${desc ? '-' : '+'} ${pasoVal.trim()}`,
+      inicializacion: `${nombre} = ${exprDesdeNatural(inicio)}`,
+      condicion: `${nombre} ${desc ? '>=' : '<='} ${exprDesdeNatural(fin)}`,
+      actualizacion: `${nombre} = ${nombre} ${desc ? '-' : '+'} ${exprDesdeNatural(pasoVal)}`,
+      cuerpo,
+    })
+  }
+  const mMientras = /^(\w+)\s+desde\s+(.+?)\s+mientras\s+(.+?)(?:\s+avanzando\s+de\s+(.+?))?(?:\s+retrocediendo\s+de\s+(.+?))?$/i.exec(contenido)
+  if (mMientras) {
+    const [, nombre, inicio, condTexto, avanzando, retrocediendo] = mMientras
+    const desc = retrocediendo != null
+    const pasoVal = (desc ? retrocediendo : avanzando) || '1'
+    let condicion
+    try {
+      condicion = condicionDesdeNatural(condTexto.trim())
+    } catch {
+      condicion = condTexto.trim()
+    }
+    return (cuerpo) => ({
+      type: 'para',
+      inicializacion: `${nombre} = ${exprDesdeNatural(inicio)}`,
+      condicion,
+      actualizacion: `${nombre} = ${nombre} ${desc ? '-' : '+'} ${exprDesdeNatural(pasoVal)}`,
       cuerpo,
     })
   }

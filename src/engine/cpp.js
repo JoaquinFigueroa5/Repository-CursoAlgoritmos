@@ -373,9 +373,13 @@ function esIdentificador(p) {
 function esAsignacion(cursor) {
   const guard = cursor.i
   cursor.espacio()
-  const esIgual = cursor.src[cursor.i] === '='
+  const a = cursor.src[cursor.i]
+  const b = cursor.src[cursor.i + 1]
   cursor.i = guard
-  return esIgual
+  if (a === '=') return true
+  if ((a === '+' || a === '-' || a === '*' || a === '/' || a === '%') && b === '=') return true
+  if ((a === '+' || a === '-') && b === a) return true
+  return false
 }
 
 function saltearHastaSemicolon(cursor) {
@@ -588,8 +592,29 @@ function tipoDesdeCpp(t) {
 }
 
 function leerAsignacion(cursor, ctx, nombre) {
-  cursor.consumir('=')
-  const valor = leerHasta(cursor, ';').trim()
+  cursor.espacio()
+  const a = cursor.src[cursor.i]
+  const b = cursor.src[cursor.i + 1]
+  let op = '='
+  if ((a === '+' || a === '-') && b === a) {
+    op = a + b
+    cursor.i += 2
+  } else if (a !== '=') {
+    op = a + '='
+    cursor.i += 2
+  } else {
+    cursor.consumir('=')
+  }
+  cursor.espacio()
+  let valor
+  if (op === '++') {
+    valor = `${nombre} + 1`
+  } else if (op === '--') {
+    valor = `${nombre} - 1`
+  } else {
+    const rhs = leerHasta(cursor, ';').trim()
+    valor = op === '=' ? rhs : `${nombre} ${op[0]} ${rhs}`
+  }
   cursor.consumir(';')
   return { type: 'asignar', nombre, valor }
 }

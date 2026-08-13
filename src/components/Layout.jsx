@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Home, ArrowRightLeft, PenTool, Terminal } from 'lucide-react'
 import { units } from '../data/units.js'
 import { MODE_META } from '../lib/theme.js'
+import RouteTransition from './RouteTransition.jsx'
 
 const NAV = [
   { to: '/', label: 'Inicio', icono: Home },
@@ -152,7 +153,9 @@ export default function Layout({ children }) {
         )}
       </header>
 
-      <main>{children}</main>
+      <main>
+        <RouteTransition ruta={pathname}>{children}</RouteTransition>
+      </main>
 
       <footer className="border-t border-night-700/70">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-4 py-10 text-center sm:px-6">

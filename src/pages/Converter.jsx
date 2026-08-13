@@ -70,7 +70,12 @@ export default function Converter() {
       return
     }
     if (destino === 'flujo') {
-      setFlujo(flujoDesdePrograma(ir))
+      try {
+        setFlujo(flujoDesdePrograma(ir))
+      } catch (e) {
+        setResultado({ ok: false, error: String(e?.message ?? e) })
+        return
+      }
     } else if (destino === 'natural') {
       setTexto(naturalDesdePrograma(ir))
     } else if (destino === 'pseudo') {
