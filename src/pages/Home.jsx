@@ -170,7 +170,7 @@ export default function Home() {
                 className="card-unidad group relative rounded-sm border border-night-700/70 bg-night-900/40 p-5 transition-colors hover:border-night-500"
               >
                 <span
-                  className="pointer-events-none absolute inset-y-4 left-0 w-[3px] opacity-70 transition-opacity group-hover:opacity-100"
+                  className="pointer-events-none absolute inset-y-4 left-0 w-0.75 opacity-70 transition-opacity group-hover:opacity-100"
                   style={{ backgroundColor: acento.fill }}
                 />
                 <span className="pointer-events-none absolute -left-px -top-px h-2 w-2 border-l-2 border-t-2 border-night-500 transition-colors group-hover:border-night-300" />
@@ -181,11 +181,11 @@ export default function Home() {
                 <SpecLabel color={u.color}>
                   U-0{u.numero} · {u.corto}
                 </SpecLabel>
-                <span
+                {/* <span
                   className={`mt-4 inline-flex rounded-sm border p-2 ${acento.border} ${acento.bgSoft}`}
                 >
                   <Icono size={18} className={acento.text} />
-                </span>
+                </span> */}
                 <h3 className="mt-4 font-heading text-xl font-bold uppercase leading-5 tracking-wide text-night-50 transition-colors group-hover:text-white">
                   {u.titulo}
                 </h3>
