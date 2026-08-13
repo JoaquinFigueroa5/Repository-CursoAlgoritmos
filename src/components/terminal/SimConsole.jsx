@@ -38,25 +38,35 @@ const SimConsole = forwardRef(function SimConsole(
   const inputRef = useRef(null)
   const histRef = useRef([])
   const histIdxRef = useRef(-1)
+  const buferRef = useRef([])
+  const pendRef = useRef('')
+  const tipoPendRef = useRef('out')
+
+  const lineaAbierta = () =>
+    pendRef.current ? [{ tipo: tipoPendRef.current, s: pendRef.current }] : []
 
   const anexar = (texto, tipo = 'out') => {
     if (!texto) return
-    const partes = texto.split('\n')
-    setLineas((prev) => {
-      const siguiente = [...prev]
-      for (let i = 0; i < partes.length; i++) {
-        if (partes[i] === '') continue
-        if (i === 0 && siguiente.length && siguiente[siguiente.length - 1].tipo === tipo) {
-          siguiente[siguiente.length - 1].s += partes[i]
-        } else {
-          siguiente.push({ tipo, s: partes[i] })
-        }
-      }
-      return siguiente
-    })
+    const bufer = buferRef.current
+    if (pendRef.current && tipoPendRef.current !== tipo) {
+      bufer.push({ tipo: tipoPendRef.current, s: pendRef.current })
+      pendRef.current = ''
+    }
+    const contenido = pendRef.current + texto
+    const partes = contenido.split('\n')
+    const resto = partes.pop()
+    for (const parte of partes) {
+      bufer.push({ tipo, s: parte })
+    }
+    pendRef.current = resto
+    tipoPendRef.current = tipo
+    setLineas([...bufer, ...lineaAbierta()])
   }
 
   const limpiar = () => {
+    buferRef.current = []
+    pendRef.current = ''
+    tipoPendRef.current = 'out'
     setLineas([])
     setValor('')
     histRef.current = []
@@ -83,7 +93,8 @@ const SimConsole = forwardRef(function SimConsole(
   const enviar = () => {
     if (!entradaHabilitada) return
     const linea = valor
-    setLineas((prev) => [...prev, { tipo: 'in', s: `> ${linea}` }])
+    buferRef.current.push({ tipo: 'in', s: `> ${linea}` })
+    setLineas([...buferRef.current, ...lineaAbierta()])
     histRef.current.push(linea)
     histIdxRef.current = -1
     setValor('')

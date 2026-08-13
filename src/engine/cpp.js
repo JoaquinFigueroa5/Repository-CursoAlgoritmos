@@ -82,14 +82,23 @@ function cppDesdePaso(paso, tabla) {
       return mientrasCpp(paso, tabla)
     case 'hacerMientras':
       return hacerMientrasCpp(paso, tabla)
+    case 'switch':
+      return switchCpp(paso, tabla)
+    case 'break':
+      return 'break;'
+    case 'continue':
+      return 'continue;'
     default:
       return null
   }
 }
 
 function declararCpp(paso) {
-  const tipo = TIPO_CPP[paso.tipo] ?? 'int'
   const valor = paso.valor != null ? ` = ${paso.valor}` : ''
+  if (paso.tipo === TIPOS.STRING) {
+    return `char ${paso.nombre}[100]${valor};`
+  }
+  const tipo = TIPO_CPP[paso.tipo] ?? 'int'
   return `${tipo} ${paso.nombre}${valor};`
 }
 
@@ -97,7 +106,9 @@ function leerCpp(paso, tabla) {
   const specs = paso.variables
     .map((v) => ESPECIFICADOR[tabla[v]] ?? ESPECIFICADOR[TIPOS.INT])
     .join(' ')
-  const refs = paso.variables.map((v) => `&${v}`).join(', ')
+  const refs = paso.variables
+    .map((v) => (tabla[v] === TIPOS.STRING ? v : `&${v}`))
+    .join(', ')
   return `scanf("${specs}", ${refs});`
 }
 
@@ -146,6 +157,22 @@ function hacerMientrasCpp(paso, tabla) {
   const cuerpo = cppDesdePasos(paso.cuerpo, tabla)
   const contenido = cuerpo ? indentar(cuerpo) : '// sin instrucciones'
   return `do {\n${contenido}\n} while (${paso.condicion});`
+}
+
+function switchCpp(paso, tabla) {
+  const lineas = [`switch (${paso.expresion}) {`]
+  for (const c of paso.casos) {
+    lineas.push(`case ${c.valor}:`)
+    const cuerpo = cppDesdePasos(c.pasos, tabla)
+    if (cuerpo) lineas.push(indentar(cuerpo))
+  }
+  if (paso.defecto.length) {
+    lineas.push('default:')
+    const cuerpo = cppDesdePasos(paso.defecto, tabla)
+    if (cuerpo) lineas.push(indentar(cuerpo))
+  }
+  lineas.push('}')
+  return lineas.join('\n')
 }
 
 function indentar(texto) {
@@ -308,6 +335,14 @@ function leerSentencia(cursor, ctx) {
       return leerDo(cursor, ctx)
     case 'for':
       return leerFor(cursor, ctx)
+    case 'switch':
+      return leerSwitch(cursor, ctx)
+    case 'break':
+      cursor.consumir(';')
+      return { type: 'break' }
+    case 'continue':
+      cursor.consumir(';')
+      return { type: 'continue' }
     case 'return':
       saltearHastaSemicolon(cursor)
       return null
@@ -345,6 +380,11 @@ function esAsignacion(cursor) {
 
 function saltearHastaSemicolon(cursor) {
   while (!cursor.eof() && cursor.peek() !== ';') cursor.i++
+  if (!cursor.eof()) cursor.i++
+}
+
+function saltearHasta(cursor, char) {
+  while (!cursor.eof() && cursor.src[cursor.i] !== char) cursor.i++
   if (!cursor.eof()) cursor.i++
 }
 
@@ -398,6 +438,61 @@ function leerFor(cursor, ctx) {
     actualizacion: upd.trim(),
     cuerpo,
   }
+}
+
+function leerSwitch(cursor, ctx) {
+  const expr = leerParens(cursor)
+  cursor.esperar('{')
+  const casos = []
+  let defecto = []
+  while (true) {
+    cursor.espacio()
+    if (cursor.eof()) throw new Error('Switch sin llave de cierre "}"')
+    if (cursor.peek() === '}') {
+      cursor.i++
+      break
+    }
+    const palabra = cursor.palabra()
+    if (palabra === 'case') {
+      const valor = leerHasta(cursor, ':').trim()
+      cursor.consumir(':')
+      casos.push({ valor, pasos: leerCuerpoSwitch(cursor, ctx) })
+    } else if (palabra === 'default') {
+      cursor.consumir(':')
+      defecto = leerCuerpoSwitch(cursor, ctx)
+    } else {
+      throw new Error(
+        `Se esperaba "case", "default" o "}" dentro del switch, se encontró "${palabra}"`,
+      )
+    }
+  }
+  if (!casos.length && !defecto.length) {
+    throw new Error(`El switch sobre "${expr}" no tiene casos.`)
+  }
+  return { type: 'switch', expresion: expr, casos, defecto }
+}
+
+function leerCuerpoSwitch(cursor, ctx) {
+  const pasos = []
+  while (true) {
+    cursor.espacio()
+    if (cursor.eof()) break
+    if (cursor.peek() === '}') break
+    const guard = cursor.i
+    const palabra = cursor.palabra()
+    if (palabra === 'case' || palabra === 'default') {
+      cursor.i = guard
+      break
+    }
+    cursor.i = guard
+    if (cursor.peek() === ';') {
+      cursor.i++
+      continue
+    }
+    const paso = leerSentencia(cursor, ctx)
+    if (paso) pasos.push(paso)
+  }
+  return pasos
 }
 
 function leerParens(cursor) {
@@ -461,7 +556,13 @@ function leerCuerpoObligatorio(cursor, ctx) {
 function leerDeclaracion(cursor, ctx, tipoCpp) {
   const nombre = cursor.palabra()
   if (!nombre) throw new Error('Declaración sin nombre de variable')
-  const tipo = tipoDesdeCpp(tipoCpp)
+  let tipo = tipoDesdeCpp(tipoCpp)
+  cursor.espacio()
+  if (cursor.peek() === '[') {
+    // char nombre[100] -> cadena
+    saltearHasta(cursor, ']')
+    tipo = TIPOS.STRING
+  }
   let valor
   cursor.espacio()
   if (cursor.peek() === '=') {

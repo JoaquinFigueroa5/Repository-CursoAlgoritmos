@@ -63,6 +63,16 @@ export const nHacerMientras = (cuerpo, condicion) => ({
   condicion,
 })
 
+export const nSwitch = (expresion, casos, defecto = []) => ({
+  type: 'switch',
+  expresion,
+  casos,
+  defecto,
+})
+
+export const nBreak = () => ({ type: 'break' })
+export const nContinuar = () => ({ type: 'continue' })
+
 export const programa = (pasos) => ({ pasos })
 
 export const programaVacio = () => programa([nInicio(), nFin()])
@@ -92,6 +102,9 @@ export function recorrerPasos(pasos, fn) {
       paso.type === 'hacerMientras'
     ) {
       recorrerPasos(paso.cuerpo, fn)
+    } else if (paso.type === 'switch') {
+      for (const c of paso.casos) recorrerPasos(c.pasos, fn)
+      recorrerPasos(paso.defecto, fn)
     }
   }
 }

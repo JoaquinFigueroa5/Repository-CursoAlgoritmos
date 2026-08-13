@@ -16,9 +16,11 @@ export const NODE_SIZES = {
   entrada: { w: 180, h: 64 },
   salida: { w: 180, h: 64 },
   decision: { w: 190, h: 100 },
+  switch: { w: 200, h: 90 },
 }
 const GAP_V = 66
 const GAP_BRANCH = 250
+const GAP_LOOP = 250
 
 let idC = 0
 const nid = () => `n${++idC}`
@@ -86,7 +88,12 @@ function layoutPaso(paso, x0, y0) {
     case 'fin':
       return layoutSimple(x0, y0, 'fin', 'Fin')
     case 'declarar':
-      return layoutSimple(x0, y0, 'proceso', `Declarar ${paso.nombre} como ${tipoNombreLocal(paso.tipo)}`)
+      return layoutSimple(
+        x0,
+        y0,
+        'proceso',
+        `Declarar ${paso.nombre} como ${tipoNombreLocal(paso.tipo)}${paso.valor != null ? ` = ${paso.valor}` : ''}`,
+      )
     case 'asignar':
       return layoutSimple(x0, y0, 'proceso', `${paso.nombre} = ${paso.valor}`)
     case 'leer':
@@ -101,6 +108,12 @@ function layoutPaso(paso, x0, y0) {
       return layoutMientras(paso, x0, y0)
     case 'hacerMientras':
       return layoutHacerMientras(paso, x0, y0)
+    case 'switch':
+      return layoutSwitch(paso, x0, y0)
+    case 'break':
+      return layoutSimple(x0, y0, 'proceso', 'Salir del ciclo')
+    case 'continue':
+      return layoutSimple(x0, y0, 'proceso', 'Continuar')
     default:
       return layoutSimple(x0, y0, 'proceso', '')
   }
@@ -130,13 +143,13 @@ function layoutSi(paso, x0, y0) {
     Lthen = layoutSecuencia(paso.entonces, x0 - GAP_BRANCH, thenY)
     nodes.push(...Lthen.nodes)
     edges.push(...Lthen.edges)
-    edges.push({ id: eid(), source: dId, target: Lthen.entry.id, label: 'Sí' })
+    edges.push({ id: eid(), source: dId, target: Lthen.entry.id, label: 'Sí', sourceHandle: 's-left' })
   }
   if (paso.siNo.length) {
     Lelse = layoutSecuencia(paso.siNo, x0 + GAP_BRANCH, elseY)
     nodes.push(...Lelse.nodes)
     edges.push(...Lelse.edges)
-    edges.push({ id: eid(), source: dId, target: Lelse.entry.id, label: 'No' })
+    edges.push({ id: eid(), source: dId, target: Lelse.entry.id, label: 'No', sourceHandle: 's-right' })
   }
   const exits = []
   if (paso.entonces.length) exits.push(...Lthen.exits)
@@ -156,31 +169,48 @@ function layoutSi(paso, x0, y0) {
 function layoutPara(paso, x0, y0) {
   const iId = nid()
   const dId = nid()
+  const pH = NODE_SIZES.proceso.h
+  const dH = NODE_SIZES.decision.h
   const nodes = [
     makeNode(iId, x0, y0, 'proceso', paso.inicializacion),
-    makeNode(dId, x0, y0 + NODE_SIZES.proceso.h + GAP_V, 'decision', paso.condicion),
+    makeNode(dId, x0, y0 + pH + GAP_V, 'decision', paso.condicion),
   ]
   const edges = [{ id: eid(), source: iId, target: dId }]
-  const bodyY = y0 + NODE_SIZES.proceso.h + GAP_V + NODE_SIZES.decision.h + GAP_V
+  const bodyY = y0 + pH + GAP_V + dH + GAP_V
   let Lbody = null
   if (paso.cuerpo.length) {
-    Lbody = layoutSecuencia(paso.cuerpo, x0, bodyY)
+    Lbody = layoutSecuencia(paso.cuerpo, x0 + GAP_LOOP, bodyY)
     nodes.push(...Lbody.nodes)
     edges.push(...Lbody.edges)
-    edges.push({ id: eid(), source: dId, target: Lbody.entry.id, label: 'Sí' })
+    edges.push({
+      id: eid(),
+      source: dId,
+      target: Lbody.entry.id,
+      label: 'Sí',
+      sourceHandle: 's-right',
+      sourcePosition: 'right',
+      targetPosition: 'top',
+    })
   }
   const uY = bodyY + (Lbody?.h ?? 0) + GAP_V
   const uId = nid()
-  nodes.push(makeNode(uId, x0, uY, 'proceso', paso.actualizacion))
+  nodes.push(makeNode(uId, x0 + (Lbody ? GAP_LOOP : 0), uY, 'proceso', paso.actualizacion))
   if (Lbody) {
     for (const ex of Lbody.exits) {
       edges.push({ id: eid(), source: ex.id, target: uId })
     }
   } else {
-    edges.push({ id: eid(), source: dId, target: uId, label: 'Sí' })
+    edges.push({ id: eid(), source: dId, target: uId, label: 'Sí', sourceHandle: 's-right', sourcePosition: 'right' })
   }
-  edges.push({ id: eid(), source: uId, target: dId, animated: true })
-  const h = (Lbody?.h ?? 0) + NODE_SIZES.decision.h + NODE_SIZES.proceso.h + GAP_V * 2 + NODE_SIZES.proceso.h
+  edges.push({
+    id: eid(),
+    source: uId,
+    target: dId,
+    targetHandle: 't-left',
+    targetPosition: 'left',
+    animated: true,
+  })
+  const h = (Lbody?.h ?? 0) + dH + pH * 2 + GAP_V * 3
   return { nodes, edges, h, entry: { id: iId }, exits: [{ id: dId, label: 'No' }] }
 }
 
@@ -191,14 +221,27 @@ function layoutMientras(paso, x0, y0) {
   const bodyY = y0 + NODE_SIZES.decision.h + GAP_V
   let Lbody = null
   if (paso.cuerpo.length) {
-    Lbody = layoutSecuencia(paso.cuerpo, x0, bodyY)
+    Lbody = layoutSecuencia(paso.cuerpo, x0 + GAP_LOOP, bodyY)
     nodes.push(...Lbody.nodes)
     edges.push(...Lbody.edges)
-    edges.push({ id: eid(), source: dId, target: Lbody.entry.id, label: 'Sí' })
-  }
-  if (Lbody) {
+    edges.push({
+      id: eid(),
+      source: dId,
+      target: Lbody.entry.id,
+      label: 'Sí',
+      sourceHandle: 's-right',
+      sourcePosition: 'right',
+      targetPosition: 'top',
+    })
     for (const ex of Lbody.exits) {
-      edges.push({ id: eid(), source: ex.id, target: dId, animated: true })
+      edges.push({
+        id: eid(),
+        source: ex.id,
+        target: dId,
+        targetHandle: 't-left',
+        targetPosition: 'left',
+        animated: true,
+      })
     }
   }
   const h = NODE_SIZES.decision.h + (Lbody?.h ? GAP_V + Lbody.h : 0)
@@ -221,10 +264,65 @@ function layoutHacerMientras(paso, x0, y0) {
     for (const ex of Lbody.exits) {
       edges.push({ id: eid(), source: ex.id, target: dId })
     }
-    edges.push({ id: eid(), source: dId, target: Lbody.entry.id, label: 'Sí', animated: true })
+    edges.push({
+      id: eid(),
+      source: dId,
+      target: Lbody.entry.id,
+      label: 'Sí',
+      sourceHandle: 's-right',
+      sourcePosition: 'right',
+      targetHandle: 't-left',
+      targetPosition: 'left',
+      animated: true,
+    })
   }
   const h = (Lbody?.h ?? 0) + GAP_V + NODE_SIZES.decision.h
   return { nodes, edges, h, entry: Lbody ? Lbody.entry : { id: dId }, exits: [{ id: dId, label: 'No' }] }
+}
+
+function layoutSwitch(paso, x0, y0) {
+  const sId = nid()
+  const nodes = [makeNode(sId, x0, y0, 'switch', paso.expresion)]
+  const edges = []
+  const ramas = paso.casos.map((c) => ({ etiqueta: `Caso ${c.valor}`, pasos: c.pasos }))
+  if (paso.defecto.length) ramas.push({ etiqueta: 'De otro modo', pasos: paso.defecto })
+  const n = ramas.length
+  if (n === 0) {
+    return {
+      nodes,
+      edges,
+      h: NODE_SIZES.switch.h,
+      entry: { id: sId },
+      exits: [{ id: sId, label: null }],
+    }
+  }
+  const branchY = y0 + NODE_SIZES.switch.h + GAP_V
+  const heights = []
+  const exits = []
+  ramas.forEach((r, k) => {
+    const bx = x0 + (k - (n - 1) / 2) * GAP_BRANCH
+    const L = r.pasos.length
+      ? layoutSecuencia(r.pasos, bx, branchY)
+      : layoutSimple(bx, branchY, 'proceso', '// sin instrucciones')
+    nodes.push(...L.nodes)
+    edges.push(...L.edges)
+    edges.push({
+      id: eid(),
+      source: sId,
+      target: L.entry.id,
+      label: r.etiqueta,
+      sourceHandle: `s-case-${k}`,
+    })
+    heights.push(L.h)
+    exits.push(...L.exits)
+  })
+  return {
+    nodes,
+    edges,
+    h: NODE_SIZES.switch.h + GAP_V + Math.max(...heights),
+    entry: { id: sId },
+    exits,
+  }
 }
 
 const TIPO_NOMBRE_LOCAL = { int: 'entero', float: 'real', char: 'caracter', string: 'cadena' }
@@ -255,6 +353,7 @@ export function programaDesdeFlujo(nodes, edges) {
     for (const L of loops) {
       loopMap[L.entryId] = L
       if (L.initNodeId) absorbed.add(L.initNodeId)
+      if (L.updateNodeId) absorbed.add(L.updateNodeId)
     }
 
     const result = walk(inicioId, new Set(), new Set(), null, {
@@ -299,7 +398,13 @@ export function validarFlujo(nodes, edges) {
     if (n.type === 'decision' && out.length !== 2) {
       errores.push(`La decisión "${n.data.label}" debe tener exactamente 2 salidas (Sí y No).`)
     }
-    if (n.type !== 'decision' && n.type !== 'fin' && out.length > 1) {
+    if (n.type === 'switch') {
+      const defaults = out.filter((e) => /^(de\s+otro\s+modo|default)$/i.test((e.label || '').trim()))
+      if (defaults.length > 1) {
+        errores.push(`El Según "${n.data.label}" no puede tener más de una rama "De otro modo".`)
+      }
+    }
+    if (n.type !== 'decision' && n.type !== 'switch' && n.type !== 'fin' && out.length > 1) {
       errores.push(`El nodo "${n.data.label}" no puede tener más de una salida.`)
     }
     if (out.length === 0 && n.type !== 'fin') {
@@ -357,7 +462,13 @@ function validarTextoNodo(n) {
   const label = (n.data.label || '').trim()
   if (n.type === 'proceso') {
     if (!label) return `El proceso sin texto debe tener una asignación (ej. "x = 5").`
-    if (!/^Declarar\s+/i.test(label) && !label.includes('=')) {
+    if (
+      !/^Declarar\s+/i.test(label) &&
+      !label.includes('=') &&
+      !/^\/\/\s*sin\s+instrucciones$/i.test(label) &&
+      !/^Salir\s+del\s+ciclo\.?$/i.test(label) &&
+      !/^(Continuar|Continue)\.?$/i.test(label)
+    ) {
       return `El proceso "${label}" debe ser una asignación (ej. "x = x + 1").`
     }
   }
@@ -369,6 +480,9 @@ function validarTextoNodo(n) {
   }
   if (n.type === 'decision' && !label) {
     return `La decisión debe tener una condición (ej. "x > 0").`
+  }
+  if (n.type === 'switch' && !label) {
+    return `El nodo Según debe tener una expresión (ej. "op").`
   }
   return null
 }
@@ -468,12 +582,13 @@ function construirLoop(be, parent, nodes, adjacency) {
     const backSource = nodes.find((n) => n.id === be.source)
     if (initNode && backSource) {
       const mInit = /^(\w+)\s*=\s*(.+)$/.exec(initNode.data.label || '')
-      const mUpd = /^(\w+)\s*=\s*\1\s*\+\s*(.+)$/.exec(backSource.data.label || '')
+      const mUpd = /^(\w+)\s*=\s*\1\s*(?:\+|-)\s*(.+)$/.exec(backSource.data.label || '')
       if (mInit && mUpd && mInit[1] === mUpd[1]) {
         L.tipo = 'para'
         L.initNodeId = initNode.id
         L.initText = initNode.data.label
         L.updateText = backSource.data.label
+        L.updateNodeId = backSource.id
       }
     }
   }
@@ -514,9 +629,11 @@ function calcularJoin(a, b, stopAt, adjacency) {
       const u = pila.shift()
       if (visit.has(u)) continue
       visit.add(u)
-      if (u !== stopAt) orden.push(u)
-      for (const e of adjacency[u] ?? []) {
-        if (!visit.has(e.target)) pila.push(e.target)
+      if (u !== stopAt) {
+        orden.push(u)
+        for (const e of adjacency[u] ?? []) {
+          if (!visit.has(e.target)) pila.push(e.target)
+        }
       }
     }
     return { orden, set: visit }
@@ -527,6 +644,37 @@ function calcularJoin(a, b, stopAt, adjacency) {
     if (setB.has(id)) return id
   }
   if (stopAt != null && setA.has(stopAt) && setB.has(stopAt)) return stopAt
+  return null
+}
+
+function calcularJoinMulti(starts, stopAt, adjacency) {
+  if (!starts.length) return null
+  const bfs = (start) => {
+    const orden = []
+    const visit = new Set()
+    const pila = [start]
+    while (pila.length) {
+      const u = pila.shift()
+      if (visit.has(u)) continue
+      visit.add(u)
+      if (u !== stopAt) {
+        orden.push(u)
+        for (const e of adjacency[u] ?? []) {
+          if (!visit.has(e.target)) pila.push(e.target)
+        }
+      }
+    }
+    return { orden, set: visit }
+  }
+  const todos = starts.map((s) => bfs(s))
+  let comun = new Set(todos[0].set)
+  for (const { set } of todos.slice(1)) {
+    comun = new Set([...comun].filter((x) => set.has(x)))
+  }
+  for (const id of todos[0].orden) {
+    if (comun.has(id)) return id
+  }
+  if (stopAt != null && todos.every(({ set }) => set.has(stopAt))) return stopAt
   return null
 }
 
@@ -561,6 +709,44 @@ function walk(id, path, suppress, stopAt, ctx) {
   }
 
   const out = ctx.adjacency[id] ?? []
+  if (node.type === 'switch') {
+    const expr = node.data.label.trim()
+    if (out.length === 0) {
+      return { pasos: [{ type: 'switch', expresion: expr, casos: [], defecto: [] }], nextId: null }
+    }
+    if (out.length === 1 && !(out[0].label || '').trim()) {
+      const next = walk(out[0].target, new Set([...path, id]), suppress, stopAt, ctx)
+      return {
+        pasos: [{ type: 'switch', expresion: expr, casos: [], defecto: [] }, ...next.pasos],
+        nextId: next.nextId,
+      }
+    }
+    const starts = out.map((e) => e.target)
+    const join = calcularJoinMulti(starts, stopAt, ctx.adjacency)
+    if (!join) {
+      throw new Error(`No se encuentra el punto donde se unen las ramas del Según "${expr}".`)
+    }
+    const casos = []
+    let defecto = []
+    for (const e of out) {
+      const etiqueta = (e.label || '').trim()
+      const esDefault = /^(de\s+otro\s+modo|default)$/i.test(etiqueta)
+      const res = walk(e.target, new Set([...path, id]), suppress, join, ctx)
+      const pasos = res.pasos
+      if (esDefault) {
+        defecto = pasos
+      } else {
+        const valor = /^caso\s+/i.test(etiqueta)
+          ? etiqueta.replace(/^caso\s+/i, '').trim()
+          : etiqueta
+        casos.push({ valor, pasos })
+      }
+    }
+    const paso = { type: 'switch', expresion: expr, casos, defecto }
+    const next = walk(join, path, suppress, stopAt, ctx)
+    return { pasos: [paso, ...next.pasos], nextId: next.nextId }
+  }
+
   if (node.type === 'decision') {
     if (out.length !== 2) throw new Error(`La decisión "${node.data.label}" debe tener dos salidas.`)
     const tE = edgeTrue(out)
@@ -608,6 +794,11 @@ function walkBody(startId, boundaryId, path, suppress, ctx, saltarUltimo) {
     const out = ctx.adjacency[current] ?? []
     if (out.length === 0) throw new Error('El flujo se corta sin cerrar el ciclo.')
     if (out.length === 1) {
+      if (ctx.absorbed.has(current)) {
+        if (out[0].target === boundaryId) break
+        current = out[0].target
+        continue
+      }
       const paso = pasoDesdeNodo(ctx.nodes.find((n) => n.id === current))
       if (out[0].target === boundaryId) {
         if (!saltarUltimo && paso) pasos.push(paso)
@@ -633,12 +824,17 @@ function pasoDesdeNodo(node) {
     case 'decision':
       return null
     case 'proceso': {
+      if (/^\/\/\s*sin\s+instrucciones$/i.test(label)) return null
+      if (/^Salir\s+del\s+ciclo\.?$/i.test(label)) return { type: 'break' }
+      if (/^(Continuar|Continue)\.?$/i.test(label)) return { type: 'continue' }
       if (/^Declarar\s+/i.test(label)) {
         const contenido = label.replace(/^Declarar\s+/i, '')
-        const m = /^(\w+)\s+como\s+(.+)$/i.exec(contenido)
-        const m2 = /^(\w+)$/.exec(contenido)
-        if (m) return { type: 'declarar', nombre: m[1], tipo: tipoDesdeNombreLocal(m[2]), valor: null }
-        if (m2) return { type: 'declarar', nombre: m2[1], tipo: 'int', valor: null }
+        const m = /^(\w+)\s+como\s+(.+?)\s*=\s*(.+)$/i.exec(contenido)
+        const m2 = /^(\w+)\s+como\s+(.+)$/i.exec(contenido)
+        const m3 = /^(\w+)$/.exec(contenido)
+        if (m) return { type: 'declarar', nombre: m[1], tipo: tipoDesdeNombreLocal(m[2]), valor: m[3].trim() }
+        if (m2) return { type: 'declarar', nombre: m2[1], tipo: tipoDesdeNombreLocal(m2[2]), valor: null }
+        if (m3) return { type: 'declarar', nombre: m3[1], tipo: 'int', valor: null }
         throw new Error(`Declaración no válida: "${label}"`)
       }
       const eq = label.indexOf('=')
@@ -689,8 +885,8 @@ export function flujoEjemplo() {
   const e = []
   e.push({ id: eid(), source: nInicio.id, target: nLeer.id })
   e.push({ id: eid(), source: nLeer.id, target: nDec.id })
-  e.push({ id: eid(), source: nDec.id, target: nPos.id, label: 'Sí' })
-  e.push({ id: eid(), source: nDec.id, target: nNeg.id, label: 'No' })
+  e.push({ id: eid(), source: nDec.id, target: nPos.id, label: 'Sí', sourceHandle: 's-left' })
+  e.push({ id: eid(), source: nDec.id, target: nNeg.id, label: 'No', sourceHandle: 's-right' })
   e.push({ id: eid(), source: nPos.id, target: nFin.id })
   e.push({ id: eid(), source: nNeg.id, target: nFin.id })
   return { nodes: [nInicio, nLeer, nDec, nPos, nNeg, nFin], edges: e }

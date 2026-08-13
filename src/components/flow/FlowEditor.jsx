@@ -6,6 +6,7 @@ import {
   Box,
   TextCursorInput,
   CornerDownRight,
+  ListOrdered,
 } from 'lucide-react'
 import {
   applyEdgeChanges,
@@ -24,6 +25,7 @@ const PALETA = [
   { tipo: 'entrada', label: 'Entrada', icono: Triangle, color: 'text-neon-pink' },
   { tipo: 'salida', label: 'Salida', icono: TextCursorInput, color: 'text-neon-amber' },
   { tipo: 'decision', label: 'Decisión', icono: Box, color: 'text-neon-cyan' },
+  { tipo: 'switch', label: 'Según', icono: ListOrdered, color: 'text-neon-purple' },
   { tipo: 'fin', label: 'Fin', icono: CornerDownRight, color: 'text-neon-red' },
 ]
 
@@ -34,6 +36,7 @@ const ETIQUETA_POR_TIPO = {
   entrada: 'Leer a',
   salida: 'Mostrar a',
   decision: 'a > 0',
+  switch: 'opción',
 }
 
 export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {

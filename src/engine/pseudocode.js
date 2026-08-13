@@ -35,7 +35,7 @@ function pseudoDesdePaso(paso, nivel, sangria) {
       return []
     case 'declarar':
       return [
-        `${sangria}Declarar ${paso.nombre} como ${tipoNombre(paso.tipo)}`,
+        `${sangria}Declarar ${paso.nombre} como ${tipoNombre(paso.tipo)}${paso.valor != null ? ` = ${paso.valor}` : ''}`,
       ]
     case 'asignar':
       return [`${sangria}${paso.nombre} = ${paso.valor}`]
@@ -51,6 +51,12 @@ function pseudoDesdePaso(paso, nivel, sangria) {
       return mientrasPseudo(paso, nivel, sangria)
     case 'hacerMientras':
       return hacerMientrasPseudo(paso, nivel, sangria)
+    case 'switch':
+      return switchPseudo(paso, nivel, sangria)
+    case 'break':
+      return [`${sangria}Salir del ciclo`]
+    case 'continue':
+      return [`${sangria}Continuar`]
     default:
       return []
   }
@@ -85,11 +91,14 @@ function paraPseudo(paso, nivel, sangria) {
 
 function formaParaSimple(paso) {
   const mInit = /^(\w+)\s*=\s*(.+)$/.exec(paso.inicializacion)
-  const mCond = /^(\w+)\s*<=\s*(.+)$/.exec(paso.condicion)
-  const mUpd = /^(\w+)\s*=\s*\1\s*\+\s*(.+)$/.exec(paso.actualizacion)
+  const mCond = /^(\w+)\s*(<=|>=)\s*(.+)$/.exec(paso.condicion)
+  const mUpd = /^(\w+)\s*=\s*\1\s*(?:\+|-)\s*(.+)$/.exec(paso.actualizacion)
   if (mInit && mCond && mUpd && mInit[1] === mCond[1] && mCond[1] === mUpd[1]) {
-    const step = mUpd[2].trim() === '1' ? '' : ` Paso ${mUpd[2].trim()}`
-    return { inicio: `${mInit[1]} = ${mInit[2].trim()}`, fin: mCond[2].trim(), step }
+    const desc = mCond[2] === '>='
+    const pasoVal = mUpd[2].trim()
+    const signo = desc ? '-' : ''
+    const step = pasoVal === '1' && !desc ? '' : ` Paso ${signo}${pasoVal}`
+    return { inicio: `${mInit[1]} = ${mInit[2].trim()}`, fin: mCond[3].trim(), step }
   }
   return null
 }
@@ -105,6 +114,21 @@ function hacerMientrasPseudo(paso, nivel, sangria) {
   const lineas = [`${sangria}Hacer`]
   lineas.push(...pseudoDesdePasos(paso.cuerpo, nivel + 1))
   lineas.push(`${sangria}Mientras que ${paso.condicion}`)
+  return lineas
+}
+
+function switchPseudo(paso, nivel, sangria) {
+  const lineas = [`${sangria}Según ${paso.expresion} Hacer`]
+  const sangriaCaso = '    '.repeat(nivel + 1)
+  for (const c of paso.casos) {
+    lineas.push(`${sangriaCaso}Caso ${c.valor}:`)
+    lineas.push(...pseudoDesdePasos(c.pasos, nivel + 2))
+  }
+  if (paso.defecto.length) {
+    lineas.push(`${sangriaCaso}De Otro Modo:`)
+    lineas.push(...pseudoDesdePasos(paso.defecto, nivel + 2))
+  }
+  lineas.push(`${sangria}Fin Según`)
   return lineas
 }
 
@@ -144,8 +168,11 @@ function esFinDeBloque(linea) {
     baja === 'fin si' ||
     baja === 'fin mientras' ||
     baja === 'fin para' ||
+    /^fin\s+seg[úu]n\.?$/.test(baja) ||
     baja === 'fin' ||
     baja === 'sino' ||
+    /^de\s+otro\s+modo:?$/.test(baja) ||
+    /^caso\s+/i.test(baja) ||
     baja.startsWith('mientras que')
   )
 }
@@ -215,6 +242,17 @@ function parsearLinea(ctx, linea) {
     if (cond == null) throw new Error('Se esperaba "Mientras que <condición>" tras "Hacer"')
     return { type: 'hacerMientras', cuerpo, condicion: cond }
   }
+  if (/^seg[úu]n\s+/i.test(baja)) {
+    return parseSegun(ctx, linea)
+  }
+  if (/^(salir(\s+del\s+ciclo)?|break)$/i.test(baja)) {
+    ctx.i++
+    return { type: 'break' }
+  }
+  if (/^(continuar|continue)$/i.test(baja)) {
+    ctx.i++
+    return { type: 'continue' }
+  }
   if (baja.startsWith('declarar ')) {
     ctx.i++
     return parseDeclarar(linea)
@@ -250,9 +288,18 @@ function extraerCondicion(linea) {
 }
 
 function parseDeclarar(linea) {
-  // "Declarar x como entero" | "Declarar x"
+  // "Declarar x como entero" | "Declarar x" | "Declarar x como entero = 0"
   const contenido = linea.slice('Declarar'.length).trim()
-  const m = /^(\w+)\s+como\s+(.+)$/i.exec(contenido)
+  let m = /^(\w+)\s+como\s+(.+?)\s*=\s*(.+)$/i.exec(contenido)
+  if (m) {
+    return {
+      type: 'declarar',
+      nombre: m[1],
+      tipo: tipoDesdeNombre(m[2]),
+      valor: m[3].trim(),
+    }
+  }
+  m = /^(\w+)\s+como\s+(.+)$/i.exec(contenido)
   if (m) {
     return {
       type: 'declarar',
@@ -268,16 +315,56 @@ function parseDeclarar(linea) {
   throw new Error(`Declaración no válida: "${linea}"`)
 }
 
+function parseSegun(ctx, linea) {
+  const expr = linea
+    .replace(/^Seg[úu]n\s+/i, '')
+    .replace(/\s+Hacer\s*$/i, '')
+    .trim()
+  ctx.i++
+  const casos = []
+  let defecto = []
+  while (hayLinea(ctx)) {
+    const l = lineaActual(ctx)
+    const baja = l.toLowerCase()
+    if (/^fin\s+seg[úu]n\.?$/.test(baja)) {
+      ctx.i++
+      break
+    }
+    if (/^de\s+otro\s+modo:?$/.test(baja)) {
+      ctx.i++
+      defecto = parsearBloque(ctx)
+      if (hayLinea(ctx) && /^fin\s+seg[úu]n\.?$/i.test(lineaActual(ctx))) ctx.i++
+      break
+    }
+    const mCaso = /^caso\s+(.+)$/i.exec(l)
+    if (mCaso) {
+      ctx.i++
+      const pasos = parsearBloque(ctx)
+      casos.push({ valor: mCaso[1].replace(/:$/, '').trim(), pasos })
+    } else {
+      throw new Error(
+        `Se esperaba "Caso", "De Otro Modo" o "Fin Según" en el "Según" de "${expr}", se encontró: "${l}"`,
+      )
+    }
+  }
+  if (!casos.length && !defecto.length) {
+    throw new Error(`El "Según" sobre "${expr}" no tiene casos.`)
+  }
+  return { type: 'switch', expresion: expr, casos, defecto }
+}
+
 function parsePara(linea) {
-  const simple = /^Para\s+(\w+)\s*=\s*(.+?)\s+Hasta\s+(.+?)\s+(?:Paso\s+(.+?)\s+)?Hacer$/i.exec(linea)
+  const simple = /^Para\s+(\w+)\s*=\s*(.+?)\s+Hasta\s+(.+?)\s+(?:Paso\s+([+-]?.+?)\s+)?Hacer$/i.exec(linea)
   if (simple) {
     const [, nombre, inicio, fin, paso] = simple
     const pasoVal = paso ? paso.trim() : '1'
+    const desc = pasoVal.startsWith('-')
+    const valor = desc ? pasoVal.slice(1) : pasoVal
     return (cuerpo) => ({
       type: 'para',
       inicializacion: `${nombre} = ${inicio.trim()}`,
-      condicion: `${nombre} <= ${fin.trim()}`,
-      actualizacion: `${nombre} = ${nombre} + ${pasoVal}`,
+      condicion: `${nombre} ${desc ? '>=' : '<='} ${fin.trim()}`,
+      actualizacion: `${nombre} = ${nombre} ${desc ? '-' : '+'} ${valor}`,
       cuerpo,
     })
   }

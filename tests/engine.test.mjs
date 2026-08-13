@@ -1,6 +1,7 @@
 import {
   programa,
   nInicio, nFin, nDeclarar, nMostrar, nLeer, nAsignar, nSi, nPara, nMientras, nHacerMientras,
+  nSwitch, nBreak, nContinuar,
   parteTexto, parteExpr,
 } from '../src/engine/ir.js'
 import { cppDesdePrograma, irDesdeCPP } from '../src/engine/cpp.js'
@@ -184,6 +185,101 @@ verificar(
     nFin(),
   ]),
   'acumulador con para',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('i', 'int'),
+    nPara('i = 10', 'i >= 1', 'i = i - 1', [nMostrar([parteExpr('i')])]),
+    nFin(),
+  ]),
+  'para descendente',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('suma', 'int', '0'),
+    nMostrar([parteExpr('suma')]),
+    nFin(),
+  ]),
+  'declarar con valor',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('num', 'int'),
+    nLeer(['num']),
+    nSi('num % 2 == 0', [nMostrar([parteTexto('Par')])], [nMostrar([parteTexto('Impar')])]),
+    nFin(),
+  ]),
+  'si con módulo',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('x', 'int'),
+    nLeer(['x']),
+    nSi('x > 0 && x < 10', [nMostrar([parteTexto('Entre 1 y 9')])]),
+    nFin(),
+  ]),
+  'condición compuesta',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('nombre', 'string'),
+    nMostrar([parteTexto('Ingresa tu nombre: ')]),
+    nLeer(['nombre']),
+    nMostrar([parteTexto('Hola '), parteExpr('nombre')]),
+    nFin(),
+  ]),
+  'cadena en C++',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('op', 'int'),
+    nLeer(['op']),
+    nSwitch('op', [
+      { valor: '1', pasos: [nMostrar([parteTexto('Uno')])] },
+      { valor: '2', pasos: [nMostrar([parteTexto('Dos')])] },
+      { valor: '3', pasos: [nMostrar([parteTexto('Tres')])] },
+    ], [nMostrar([parteTexto('Otro')])]),
+    nFin(),
+  ]),
+  'según con casos',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('op', 'int'),
+    nLeer(['op']),
+    nSwitch('op', [
+      { valor: '1', pasos: [nMostrar([parteTexto('Uno')]), nBreak()] },
+      { valor: '2', pasos: [nMostrar([parteTexto('Dos')]), nBreak()] },
+    ], [nMostrar([parteTexto('Otro')])]),
+    nFin(),
+  ]),
+  'según con break',
+)
+
+verificar(
+  programa([
+    nInicio(),
+    nDeclarar('i', 'int'),
+    nPara('i = 1', 'i <= 10', 'i = i + 1', [
+      nSi('i == 5', [nBreak()], [nContinuar()]),
+    ]),
+    nFin(),
+  ]),
+  'break y continue en ciclo',
 )
 
 console.log(fallos === 0 ? '\nTODOS LOS TESTS PASARON' : `\n${fallos} TEST(S) FALLARON`)
