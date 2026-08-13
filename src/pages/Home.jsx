@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { ArrowRight, Monitor, Keyboard, GitBranch, Repeat } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { units, unidadPorId } from '../data/units.js'
 import { ACCENTS, MODE_META } from '../lib/theme.js'
 import { flujoDesdePrograma } from '../engine/flowchart.js'
@@ -11,8 +11,6 @@ import SchematicFrame, { SpecLabel } from '../components/common/SchematicFrame.j
 import FlowCanvas from '../components/flow/FlowCanvas.jsx'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
-
-const ICONOS = { Monitor, Keyboard, GitBranch, Repeat }
 
 export default function Home() {
   const raiz = useRef(null)
@@ -162,7 +160,6 @@ export default function Home() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {units.map((u) => {
             const acento = ACCENTS[u.color]
-            const Icono = ICONOS[u.icono] ?? Monitor
             return (
               <Link
                 key={u.id}
@@ -181,11 +178,6 @@ export default function Home() {
                 <SpecLabel color={u.color}>
                   U-0{u.numero} · {u.corto}
                 </SpecLabel>
-                {/* <span
-                  className={`mt-4 inline-flex rounded-sm border p-2 ${acento.border} ${acento.bgSoft}`}
-                >
-                  <Icono size={18} className={acento.text} />
-                </span> */}
                 <h3 className="mt-4 font-heading text-xl font-bold uppercase leading-5 tracking-wide text-night-50 transition-colors group-hover:text-white">
                   {u.titulo}
                 </h3>
