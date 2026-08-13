@@ -1,4 +1,4 @@
-import { BookOpen, Lightbulb } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import CodeBlock from './CodeBlock.jsx'
 
 // Convierte `codigo` y **negritas** en <code>/<strong>
@@ -11,7 +11,7 @@ function Inline({ texto }) {
           return (
             <code
               key={i}
-              className="rounded bg-night-800 px-1.5 py-0.5 font-mono text-[0.85em] text-neon-cyan"
+              className="rounded-sm border border-night-700/60 bg-night-800 px-1.5 py-0.5 font-mono text-[0.85em] text-neon-cyan"
             >
               {p.slice(1, -1)}
             </code>
@@ -47,7 +47,9 @@ export default function RichText({ bloque }) {
           <ul className="space-y-2">
             {bloque.items.map((item, i) => (
               <li key={i} className="flex gap-3 leading-6 text-night-200">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-neon-cyan shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                <span className="mt-px shrink-0 font-mono text-sm font-bold text-neon-cyan">
+                  +
+                </span>
                 <span>
                   <Inline texto={item} />
                 </span>
@@ -60,8 +62,11 @@ export default function RichText({ bloque }) {
       return <CodeBlock code={bloque.contenido} label={bloque.lenguaje === 'cpp' ? 'C++' : bloque.lenguaje} />
     case 'nota':
       return (
-        <div className="flex gap-3 rounded-xl border border-neon-amber/30 bg-neon-amber/5 p-4">
-          <Lightbulb size={18} className="mt-0.5 shrink-0 text-neon-amber" />
+        <div className="relative flex gap-3 overflow-hidden rounded-sm border border-neon-amber/30 bg-neon-amber/5 p-4">
+          <span className="absolute inset-y-0 left-0 w-1 bg-neon-amber/60" />
+          <span className="shrink-0 font-mono text-[9px] font-black uppercase tracking-widest text-neon-amber">
+            Nota
+          </span>
           <p className="text-sm leading-6 text-night-200">
             <Inline texto={bloque.contenido} />
           </p>
@@ -69,12 +74,12 @@ export default function RichText({ bloque }) {
       )
     case 'tabla':
       return (
-        <div className="overflow-x-auto rounded-xl border border-night-700">
+        <div className="overflow-x-auto rounded-sm border border-night-700/70">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="border-b border-night-700 bg-night-800/60">
+              <tr className="border-b border-night-700/70 bg-night-800/60">
                 {bloque.encabezados.map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-left font-semibold text-neon-cyan">
+                  <th key={h} className="px-4 py-2.5 text-left font-mono text-[11px] font-bold uppercase tracking-wider text-neon-cyan">
                     {h}
                   </th>
                 ))}
@@ -102,11 +107,13 @@ export default function RichText({ bloque }) {
 export function SeccionInfo({ titulo, descripcion }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="mt-0.5 rounded-lg border border-neon-cyan/30 bg-neon-cyan/10 p-2">
+      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-sm border border-neon-cyan/30 bg-neon-cyan/10">
         <BookOpen size={16} className="text-neon-cyan" />
       </div>
       <div>
-        <p className="text-sm font-semibold text-night-50">{titulo}</p>
+        <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-night-50">
+          {titulo}
+        </p>
         <p className="text-sm text-night-400">{descripcion}</p>
       </div>
     </div>

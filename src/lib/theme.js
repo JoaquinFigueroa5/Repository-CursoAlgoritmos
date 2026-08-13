@@ -57,3 +57,11 @@ export const NODO_ESTILOS = {
   salida: { border: 'border-neon-amber', bg: 'bg-neon-amber/10', text: 'text-neon-amber' },
   decision: { border: 'border-neon-cyan', bg: 'bg-neon-cyan/10', text: 'text-neon-cyan' },
 }
+
+// Clave de color de las 4 representaciones. Aparece en tabs, leyendas y footer.
+export const MODE_META = {
+  natural: { label: 'Algoritmo', corto: 'natural', dot: 'bg-neon-green', text: 'text-neon-green', fill: '#4ade80' },
+  pseudo: { label: 'Pseudocódigo', corto: 'pseudo', dot: 'bg-neon-pink', text: 'text-neon-pink', fill: '#e879f9' },
+  flujo: { label: 'Diagrama', corto: 'diagrama', dot: 'bg-neon-amber', text: 'text-neon-amber', fill: '#fbbf24' },
+  cpp: { label: 'C++', corto: 'c++', dot: 'bg-neon-cyan', text: 'text-neon-cyan', fill: '#22d3ee' },
+}

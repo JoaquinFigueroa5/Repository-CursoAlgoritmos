@@ -4,6 +4,7 @@ import { naturalDesdePrograma } from '../../engine/natural.js'
 import { pseudoDesdePrograma } from '../../engine/pseudocode.js'
 import { cppDesdePrograma } from '../../engine/cpp.js'
 import { flujoDesdePrograma, altoDelFlujo } from '../../engine/flowchart.js'
+import { MODE_META } from '../../lib/theme.js'
 import CodeBlock from '../common/CodeBlock.jsx'
 import FlowCanvas from '../flow/FlowCanvas.jsx'
 
@@ -36,22 +37,28 @@ export default function FourWays({ programa: prog, defaultTab = 'natural', altoF
     : altoFlujo
 
   return (
-    <div className="rounded-2xl border border-night-700 bg-night-900/60">
-      <div className="flex flex-wrap items-center gap-1 border-b border-night-700 p-1.5">
+    <div className="rounded-sm border border-night-700/70 bg-night-900/60">
+      <div className="flex flex-wrap items-center gap-1 border-b border-night-700/70 p-1.5">
         {TABS.map((t) => {
           const Icono = t.icono
+          const meta = MODE_META[t.id]
           const activo = tab === t.id
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`flex items-center gap-1.5 rounded-sm border-b-2 px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider transition-colors ${
                 activo
-                  ? `bg-night-800 text-neon-cyan shadow-[inset_0_0_0_1px_rgba(34,211,238,0.35)]`
-                  : 'text-night-400 hover:bg-night-800/60 hover:text-night-200'
+                  ? `${meta.text} border-current bg-night-800/60`
+                  : 'border-transparent text-night-400 hover:bg-night-800/40 hover:text-night-200'
               }`}
             >
-              <Icono size={13} className={t.color} />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: meta.fill }}
+                aria-hidden="true"
+              />
+              <Icono size={13} />
               {t.label}
             </button>
           )

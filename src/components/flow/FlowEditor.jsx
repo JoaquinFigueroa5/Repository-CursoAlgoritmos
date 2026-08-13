@@ -15,6 +15,7 @@ import {
 } from '@xyflow/react'
 import { NODE_SIZES } from '../../engine/flowchart.js'
 import FlowCanvas from './FlowCanvas.jsx'
+import { SpecLabel } from '../common/SchematicFrame.jsx'
 
 let idSeq = 0
 const nid = () => `e${++idSeq}n`
@@ -118,23 +119,26 @@ export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-widest text-night-500">
-          Agregar nodo
-        </span>
-        {PALETA.map((p) => {
-          const Icono = p.icono
-          return (
-            <button
-              key={p.tipo}
-              onClick={() => agregar(p.tipo)}
-              className="flex items-center gap-1.5 rounded-lg border border-night-700 bg-night-900 px-2.5 py-1.5 text-xs font-medium text-night-300 transition-colors hover:border-neon-cyan/50 hover:text-night-100"
-            >
-              <Icono size={13} className={p.color} />
-              {p.label}
-            </button>
-          )
-        })}
+      <div className="rounded-sm border border-night-700/70 bg-night-900/40 p-3">
+        <SpecLabel color="cyan">Componentes · Nodos</SpecLabel>
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {PALETA.map((p) => {
+            const Icono = p.icono
+            return (
+              <button
+                key={p.tipo}
+                onClick={() => agregar(p.tipo)}
+                title={`Agregar ${p.label}`}
+                className="group flex flex-col items-center gap-1 rounded-sm border border-night-700/70 bg-night-950 px-3 py-2 transition-colors hover:border-neon-cyan/50 hover:bg-night-900"
+              >
+                <Icono size={14} className={`${p.color} transition-transform group-hover:-translate-y-px`} />
+                <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-night-400 transition-colors group-hover:text-night-200">
+                  {p.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <FlowCanvas
@@ -156,8 +160,8 @@ export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
       </p>
 
       {aristaSel && (
-        <div className="rounded-xl border border-neon-cyan/30 bg-night-900 p-4">
-          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-night-400">
+        <div className="rounded-sm border border-neon-cyan/30 bg-night-900 p-4">
+          <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-night-400">
             Etiqueta de la flecha
           </label>
           <input
@@ -168,7 +172,7 @@ export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
                 edges.map((ed) => (ed.id === aristaSel.id ? { ...ed, label: e.target.value } : ed)),
               )
             }
-            className="w-full rounded-lg border border-night-700 bg-night-950 px-3 py-2 font-mono text-sm text-night-100 outline-none focus:border-neon-cyan/50"
+            className="w-full rounded-sm border border-night-700 bg-night-950 px-3 py-2 font-mono text-sm text-night-100 outline-none focus:border-neon-cyan/50"
             placeholder="Sí / No / vacío"
           />
         </div>

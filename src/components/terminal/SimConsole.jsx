@@ -26,6 +26,15 @@ const BADGE = {
   error: 'bg-neon-red/15 text-neon-red',
 }
 
+const LED = {
+  inactivo: 'bg-night-600',
+  compilando: 'bg-neon-amber',
+  corriendo: 'bg-neon-cyan',
+  esperando: 'bg-neon-green',
+  fin: 'bg-neon-cyan',
+  error: 'bg-neon-red',
+}
+
 // Consola simulada tipo terminal. Expone por ref:
 // anexar(texto, tipo), anexarError, anexarSistema, limpiar, enfocar.
 const SimConsole = forwardRef(function SimConsole(
@@ -138,24 +147,23 @@ const SimConsole = forwardRef(function SimConsole(
 
   return (
     <div
-      className="overflow-hidden rounded-xl border border-night-700 bg-night-950"
+      className="overflow-hidden rounded-sm border border-night-700/70 bg-night-950"
       onClick={() => entradaHabilitada && inputRef.current?.focus()}
     >
       {/* barra de título */}
-      <div className="flex items-center justify-between border-b border-night-800 px-4 py-2">
+      <div className="flex items-center justify-between border-b border-night-700/80 bg-night-900/60 px-4 py-2">
         <div className="flex items-center gap-2">
-          <span className="flex gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-neon-red/80" />
-            <span className="h-2.5 w-2.5 rounded-full bg-neon-amber/80" />
-            <span className="h-2.5 w-2.5 rounded-full bg-neon-green/80" />
+          <span className="flex h-3.5 w-3.5 items-center justify-center border border-night-600 text-[8px] font-bold leading-none text-night-500">
+            ▮
           </span>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-night-500">
-            Consola
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-night-400">
+            TTY-01 · Consola
           </span>
         </div>
         <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${BADGE[estado] ?? BADGE.inactivo}`}
+          className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider ${BADGE[estado] ?? BADGE.inactivo}`}
         >
+          <span className={`h-1.5 w-1.5 rounded-full ${LED[estado] ?? LED.inactivo}`} />
           {ETIQUETA_ESTADO[estado] ?? estado}
         </span>
       </div>

@@ -15,6 +15,15 @@ const ESTILOS = {
   switch: { border: 'border-neon-purple', bg: 'bg-neon-purple/10', text: 'text-neon-purple' },
 }
 
+function Ticks() {
+  return (
+    <>
+      <span className="pointer-events-none absolute -left-px -top-px h-2 w-2 border-l-2 border-t-2 border-night-500" />
+      <span className="pointer-events-none absolute -right-px -bottom-px h-2 w-2 border-r-2 border-b-2 border-night-500" />
+    </>
+  )
+}
+
 function Formas({ data, id, selected, type }) {
   const [texto, setTexto] = useState(data.label ?? '')
   const tipo = data.tipo ?? type
@@ -45,6 +54,7 @@ function Formas({ data, id, selected, type }) {
 
   return (
     <div className="relative" style={s}>
+      <Ticks />
       <Handle type="target" position={Position.Top} className="h-2.5! w-2.5! border-2! border-night-950! bg-night-400!" />
       <Handle type="target" position={Position.Left} id="t-left" className="h-2! w-2! border-2! border-night-950! bg-night-400! opacity-70!" />
       {data.tipo === 'inicio' && (
@@ -125,6 +135,7 @@ function SwitchNode({ data, id, selected }) {
 
   return (
     <div className="relative" style={s}>
+      <Ticks />
       <Handle type="target" position={Position.Top} className="h-2.5! w-2.5! border-2! border-night-950! bg-night-400!" />
       {Array.from({ length: ramas }).map((_, i) => (
         <Handle

@@ -5,10 +5,12 @@ import { pseudoDesdePrograma, irDesdePseudo } from '../engine/pseudocode.js'
 import { cppDesdePrograma, irDesdeCPP } from '../engine/cpp.js'
 import { flujoDesdePrograma, programaDesdeFlujo, flujoEjemplo, altoDelFlujo } from '../engine/flowchart.js'
 import { unidadPorId } from '../data/units.js'
+import { MODE_META } from '../lib/theme.js'
 import CmEditor, { NaturalEditor } from '../components/editors/Editors.jsx'
 import FlowEditor from '../components/flow/FlowEditor.jsx'
 import FlowCanvas from '../components/flow/FlowCanvas.jsx'
 import CodeBlock from '../components/common/CodeBlock.jsx'
+import { SpecLabel } from '../components/common/SchematicFrame.jsx'
 
 function FlowCanvasSimple({ nodes, edges }) {
   return <FlowCanvas nodes={nodes} edges={edges} editable={false} minHeight={Math.max(380, Math.min(altoDelFlujo(nodes) + 90, 1100))} />
@@ -141,29 +143,38 @@ export default function Converter() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-night-50">Convertidor</h1>
-        <p className="mt-2 max-w-2xl text-night-400">
+        <SpecLabel>Sección · Herramienta</SpecLabel>
+        <h1 className="mt-3 font-heading text-4xl font-bold uppercase tracking-tight text-night-50">
+          Convertidor
+        </h1>
+        <p className="mt-3 max-w-2xl leading-7 text-night-300">
           Escribe un algoritmo en cualquiera de las 4 representaciones y conviértelo a las demás. El
           convertidor entiende todo el vocabulario del curso.
         </p>
       </div>
 
       {/* selector de fuente */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
         {FUENTES.map((f) => {
           const Icono = f.icono
+          const meta = MODE_META[f.id]
           const activo = fuente === f.id
           return (
             <button
               key={f.id}
               onClick={() => cambiarFuente(f.id)}
-              className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`flex items-center gap-1.5 rounded-sm border-b-2 px-4 py-2 font-mono text-xs font-semibold uppercase tracking-wider transition-colors ${
                 activo
-                  ? 'border-neon-cyan/60 bg-neon-cyan/10 text-neon-cyan'
-                  : 'border-night-700 text-night-400 hover:border-night-500 hover:text-night-200'
+                  ? `${meta.text} border-current bg-night-900`
+                  : 'border-transparent text-night-400 hover:text-night-200'
               }`}
             >
-              <Icono size={15} className={f.color} />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: meta.fill }}
+                aria-hidden="true"
+              />
+              <Icono size={14} />
               {f.label}
             </button>
           )
@@ -175,7 +186,7 @@ export default function Converter() {
             cargarEjemplo(ejemplos[e.target.value])
             setEjemploSel('')
           }}
-          className="rounded-xl border border-night-700 bg-night-900 px-3 py-2 text-sm text-night-300 outline-none focus:border-neon-cyan/50"
+          className="rounded-sm border border-night-700 bg-night-900 px-3 py-2 font-mono text-xs text-night-300 outline-none focus:border-neon-cyan/50"
         >
           <option value="" disabled>
             Cargar ejemplo…
@@ -206,7 +217,7 @@ export default function Converter() {
         <button
           onClick={convert}
           disabled={cargando}
-          className="flex items-center gap-2 rounded-xl bg-linear-to-b from-neon-cyan to-fuchsia-500 px-8 py-3 text-sm font-black text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.35)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.55)] disabled:cursor-wait disabled:opacity-60"
+          className="flex items-center gap-2 rounded-sm bg-linear-to-b from-neon-cyan to-fuchsia-500 px-8 py-3 font-mono text-xs font-black uppercase tracking-wider text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.35)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.55)] disabled:cursor-wait disabled:opacity-60"
         >
           {cargando ? <Loader2 size={16} className="animate-spin" /> : <ArrowRightLeft size={16} />}
           Convertir
