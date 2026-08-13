@@ -42,7 +42,6 @@ html {
 
 body {
   @apply bg-night-950 text-night-200 font-display antialiased;
-  /* Papel de calco técnico: rejilla fina casi imperceptible sobre toda la página */
   background-image:
     linear-gradient(to right, rgba(34, 211, 238, 0.028) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(34, 211, 238, 0.028) 1px, transparent 1px),
@@ -73,14 +72,14 @@ body {
 /* ---------- Utilidades: esquema técnico ---------- */
 
 /* Rejilla de plano (malla mayor + malla fina) */
-@utility bg-blueprint {
+/* @utility bg-blueprint {
   background-image:
     linear-gradient(to right, rgba(34, 211, 238, 0.09) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(34, 211, 238, 0.09) 1px, transparent 1px),
     linear-gradient(to right, rgba(34, 211, 238, 0.045) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(34, 211, 238, 0.045) 1px, transparent 1px);
   background-size: 72px 72px, 72px 72px, 18px 18px, 18px 18px;
-}
+} */
 
 /* Línea de altura tipo "raya de eje" para títulos de sección */
 @utility hairline {
