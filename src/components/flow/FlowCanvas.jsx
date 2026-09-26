@@ -1,21 +1,14 @@
-<<<<<<< HEAD
-import { useCallback, useEffect, useMemo } from 'react'
-=======
-import { useCallback, useMemo, useRef } from 'react'
->>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
+import { useCallback, useMemo, useRef, useMemo } from 'react'
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
   MarkerType,
-<<<<<<< HEAD
   useReactFlow,
-=======
   Panel,
   useReactFlow,
   getViewportForBounds,
->>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 } from '@xyflow/react'
 import { toPng } from 'html-to-image'
 import { Download } from 'lucide-react'
@@ -30,7 +23,6 @@ const defaultEdgeOptions = {
   markerEnd: { type: MarkerType.ArrowClosed, color: COLOR_ARROW },
 }
 
-<<<<<<< HEAD
 // Reencuadra cuando cambia la clave (por ejemplo, al regenerar el diagrama) sin
 // reaccionar a mover los nodos, para no interrumpir al usuario mientras arrastra.
 function Reencuadrar({ fitKey }) {
@@ -41,7 +33,8 @@ function Reencuadrar({ fitKey }) {
     return () => clearTimeout(t)
   }, [fitKey, fitView])
   return null
-=======
+}
+
 function DescargarDiagrama({ contenedorRef }) {
   const { getNodes, getNodesBounds } = useReactFlow()
 
@@ -85,7 +78,6 @@ function DescargarDiagrama({ contenedorRef }) {
       </button>
     </Panel>
   )
->>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 }
 
 export default function FlowCanvas({
@@ -98,11 +90,8 @@ export default function FlowCanvas({
   onNodeDoubleClick,
   minHeight = 380,
   fitView = true,
-<<<<<<< HEAD
   fitKey,
-=======
   className = '',
->>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 }) {
   const contenedorRef = useRef(null)
   const handleNodesChange = useCallback(
@@ -167,11 +156,8 @@ export default function FlowCanvas({
       >
         <Background variant={BackgroundVariant.Lines} gap={20} size={1} color="rgba(34,211,238,0.08)" />
         <Controls showInteractive={false} className="bg-night-900! border! border-night-700!" />
-<<<<<<< HEAD
         <Reencuadrar fitKey={fitKey} />
-=======
         <DescargarDiagrama contenedorRef={contenedorRef} />
->>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
       </ReactFlow>
     </div>
   )

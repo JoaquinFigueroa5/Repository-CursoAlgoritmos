@@ -18,11 +18,10 @@ const ESTILOS = {
   finFuncion: { border: 'border-neon-purple', bg: 'bg-neon-purple/10', text: 'text-neon-purple' },
 }
 
-<<<<<<< HEAD
 // Nodos que el motor genera y que nunca recibe ni emite aristas.
 const SIN_ARISTAS = new Set(['finFuncion'])
 const SIN_SALIDA = new Set(['finFuncion', 'devolver', 'subprograma'])
-=======
+
 function Ticks() {
   return (
     <>
@@ -31,7 +30,6 @@ function Ticks() {
     </>
   )
 }
->>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 
 function Formas({ data, id, selected, type }) {
   const [texto, setTexto] = useState(data.label ?? '')
@@ -63,18 +61,13 @@ function Formas({ data, id, selected, type }) {
 
   return (
     <div className="relative" style={s}>
-<<<<<<< HEAD
+      <Ticks />
       {!SIN_ARISTAS.has(tipo) && (
         <>
           <Handle type="target" position={Position.Top} className="h-2.5! w-2.5! border-2! border-night-950! bg-night-400!" />
           <Handle type="target" position={Position.Left} id="t-left" className="h-2! w-2! border-2! border-night-950! bg-night-400! opacity-70!" />
         </>
       )}
-=======
-      <Ticks />
-      <Handle type="target" position={Position.Top} className="h-2.5! w-2.5! border-2! border-night-950! bg-night-400!" />
-      <Handle type="target" position={Position.Left} id="t-left" className="h-2! w-2! border-2! border-night-950! bg-night-400! opacity-70!" />
->>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
       {data.tipo === 'inicio' && (
         <div className={cx('flex h-full w-full items-center justify-center rounded-full border-2', est.border, est.bg, brillo)}>
           {data.editando ? input : <span className={cx('font-mono text-xs font-semibold', est.text)}>{data.label}</span>}
