@@ -7,7 +7,6 @@ import {
   Flag,
   ChevronLeft,
   ChevronRight,
-  Target,
   Rocket,
 } from 'lucide-react'
 import { units, unidadPorId } from '../../data/units.js'
@@ -16,6 +15,7 @@ import RichText from '../common/RichText.jsx'
 import FourWays from './FourWays.jsx'
 import QuestionAccordion from './QuestionAccordion.jsx'
 import CppLab from '../editors/CppLab.jsx'
+import { SpecLabel } from '../common/SchematicFrame.jsx'
 
 const SECCIONES = [
   { id: 'teoria', label: 'Teoría', icono: BookOpenText },
@@ -49,27 +49,24 @@ export default function UnitView() {
   return (
     <div className="pb-20">
       {/* encabezado */}
-      <header
-        className={`relative overflow-hidden border-b border-night-800 bg-linear-to-b ${unidad.color === 'cyan' ? 'from-neon-cyan/15' : unidad.color === 'magenta' ? 'from-neon-pink/15' : unidad.color === 'green' ? 'from-neon-green/15' : 'from-neon-amber/15'} to-night-950`}
-      >
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-neon-cyan/10 blur-3xl" />
+      <header className={`relative overflow-hidden border-b border-night-700/70 bg-blueprint`}>
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 hidden w-1 lg:block"
+          style={{ backgroundColor: acento.fill, opacity: 0.5 }}
+        />
         <div className="relative mx-auto max-w-4xl px-4 py-12 sm:px-6">
-          <span
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] ${acento.border} ${acento.text} ${acento.bgSoft}`}
-          >
-            Unidad {unidad.numero}
-          </span>
-          <h1 className="mt-4 text-3xl font-black leading-tight text-night-50 sm:text-4xl">
+          <SpecLabel color={unidad.color}>Unidad {unidad.numero}</SpecLabel>
+          <h1 className="mt-4 font-heading text-4xl font-bold uppercase leading-none tracking-tight text-night-50 sm:text-5xl">
             {unidad.titulo}
           </h1>
-          <p className="mt-3 max-w-2xl leading-7 text-night-300">{unidad.descripcion}</p>
-          <div className="mt-6 flex flex-wrap gap-2">
+          <p className="mt-4 max-w-2xl leading-7 text-night-300">{unidad.descripcion}</p>
+          <div className="mt-7 flex flex-wrap gap-x-8 gap-y-2">
             {unidad.objetivos.map((o, i) => (
               <span
                 key={i}
-                className="flex items-center gap-1.5 rounded-lg border border-night-700 bg-night-900/70 px-3 py-1.5 text-xs text-night-300"
+                className="inline-flex items-baseline gap-2 font-mono text-[11px] leading-5 text-night-300"
               >
-                <Target size={12} className={acento.text} />
+                <span className="font-bold text-night-500">0{i + 1}</span>
                 {o}
               </span>
             ))}
@@ -78,19 +75,24 @@ export default function UnitView() {
       </header>
 
       {/* navegación por secciones */}
-      <nav className="sticky top-14 z-30 border-b border-night-800 bg-night-950/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl gap-1 overflow-x-auto px-4 py-2 sm:px-6">
-          {SECCIONES.map((s) => {
+      <nav className="sticky top-14 z-30 border-b border-night-700/70 bg-night-950/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl gap-0 overflow-x-auto px-4 py-0 sm:px-6">
+          {SECCIONES.map((s, i) => {
             const Icono = s.icono
             const activa = seccion === s.id
             return (
               <button
                 key={s.id}
                 onClick={() => setSeccion(s.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  activa ? `${acento.bgSoft} ${acento.text} ${acento.border}` : 'text-night-400 hover:bg-night-800 hover:text-night-200'
+                className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-3 text-[11px] font-semibold uppercase tracking-widest transition-colors ${
+                  activa
+                    ? `${acento.text} border-current`
+                    : 'border-transparent text-night-500 hover:text-night-200'
                 }`}
               >
+                <span className={`font-mono text-[10px] ${activa ? acento.text : 'text-night-600'}`}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
                 <Icono size={13} />
                 {s.label}
               </button>
@@ -113,10 +115,10 @@ export default function UnitView() {
         {seccion === 'ejemplos' && (
           <div className="space-y-8">
             {unidad.ejemplos.map((ej, i) => (
-              <div key={i} className="rounded-2xl border border-night-700 bg-night-900/40 p-4 sm:p-5">
+              <div key={i} className="rounded-sm border border-night-700/70 bg-night-900/40 p-4 sm:p-5">
                 <div className="mb-3 flex items-start gap-3">
                   <span
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black ${acento.bgSoft} ${acento.text} ${acento.border}`}
+                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-sm font-mono text-xs font-bold ${acento.bgSoft} ${acento.text} ${acento.border}`}
                   >
                     {i + 1}
                   </span>
@@ -155,17 +157,17 @@ export default function UnitView() {
         {/* RETO */}
         {seccion === 'reto' && unidad.reto && (
           <div
-            className={`rounded-2xl border-2 border-dashed p-6 ${acento.border} ${acento.bgSoft}`}
+            className={`rounded-sm border-2 border-dashed p-6 ${acento.border} ${acento.bgSoft}`}
           >
-            <span className={`inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] ${acento.text}`}>
+            <span className={`inline-flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.2em] ${acento.text}`}>
               <Flag size={14} />
               Reto de la unidad
             </span>
-            <h3 className="mt-2 text-xl font-bold text-night-50">{unidad.reto.titulo}</h3>
+            <h3 className="mt-2 font-heading text-2xl font-bold uppercase tracking-wide text-night-50">{unidad.reto.titulo}</h3>
             <p className="mt-2 leading-7 text-night-200">{unidad.reto.descripcion}</p>
             <button
               onClick={() => setSeccion('laboratorio')}
-              className={`mt-4 rounded-lg px-4 py-2 text-sm font-bold text-night-950 ${acento.text === 'text-neon-cyan' ? 'bg-neon-cyan' : acento.text === 'text-neon-pink' ? 'bg-neon-pink' : acento.text === 'text-neon-green' ? 'bg-neon-green' : 'bg-neon-amber'} transition-opacity hover:opacity-90`}
+              className={`mt-4 rounded-sm px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-night-950 ${acento.text === 'text-neon-cyan' ? 'bg-neon-cyan' : acento.text === 'text-neon-pink' ? 'bg-neon-pink' : acento.text === 'text-neon-green' ? 'bg-neon-green' : 'bg-neon-amber'} transition-opacity hover:opacity-90`}
             >
               Ir al laboratorio
             </button>
@@ -177,11 +179,11 @@ export default function UnitView() {
           {prev ? (
             <Link
               to={`/unidad/${prev.id}`}
-              className="flex items-center gap-2 rounded-xl border border-night-700 px-4 py-3 text-sm text-night-300 transition-colors hover:border-night-500 hover:text-night-100"
+              className="flex items-center gap-2 rounded-sm border border-night-700/70 px-4 py-3 text-sm text-night-300 transition-colors hover:border-night-500 hover:text-night-100"
             >
               <ChevronLeft size={16} />
               <span>
-                <span className="block text-[10px] uppercase tracking-widest text-night-500">Anterior</span>
+                <span className="block font-mono text-[10px] uppercase tracking-widest text-night-500">Anterior</span>
                 {prev.titulo}
               </span>
             </Link>
@@ -191,10 +193,10 @@ export default function UnitView() {
           {next ? (
             <Link
               to={`/unidad/${next.id}`}
-              className="flex items-center gap-2 rounded-xl border border-night-700 px-4 py-3 text-right text-sm text-night-300 transition-colors hover:border-night-500 hover:text-night-100"
+              className="flex items-center gap-2 rounded-sm border border-night-700/70 px-4 py-3 text-right text-sm text-night-300 transition-colors hover:border-night-500 hover:text-night-100"
             >
               <span>
-                <span className="block text-[10px] uppercase tracking-widest text-night-500">Siguiente</span>
+                <span className="block font-mono text-[10px] uppercase tracking-widest text-night-500">Siguiente</span>
                 {next.titulo}
               </span>
               <ChevronRight size={16} />

@@ -4,9 +4,11 @@ import { irDesdeNatural, naturalDesdePrograma } from '../engine/natural.js'
 import { irDesdePseudo, pseudoDesdePrograma } from '../engine/pseudocode.js'
 import { irDesdeCPP, cppDesdePrograma } from '../engine/cpp.js'
 import { programaDesdeFlujo, flujoDesdePrograma } from '../engine/flowchart.js'
+import { MODE_META } from '../lib/theme.js'
 import CmEditor, { NaturalEditor } from '../components/editors/Editors.jsx'
 import FlowEditor from '../components/flow/FlowEditor.jsx'
 import FourWays from '../components/course/FourWays.jsx'
+import { SpecLabel } from '../components/common/SchematicFrame.jsx'
 
 const EJERCICIOS = [
   {
@@ -164,8 +166,11 @@ export default function Practice() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-night-50">Práctica</h1>
-        <p className="mt-2 max-w-2xl text-night-400">
+        <SpecLabel>Sección · Ejercicios</SpecLabel>
+        <h1 className="mt-3 font-heading text-4xl font-bold uppercase tracking-tight text-night-50">
+          Práctica
+        </h1>
+        <p className="mt-3 max-w-2xl leading-7 text-night-300">
           Resuelve cada ejercicio en la representación que prefieras. Al validar, revisamos si tu
           solución usa las instrucciones correctas.
         </p>
@@ -183,19 +188,20 @@ export default function Practice() {
               setTexto('')
               setFlujo(FLUJO_INICIAL)
             }}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 rounded-sm px-3 py-1.5 font-mono text-[11px] font-semibold transition-colors ${
               i === idx
-                ? 'bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/40'
+                ? 'border border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan'
                 : 'border border-night-700 text-night-400 hover:text-night-200'
             }`}
           >
-            {i + 1}. {e.titulo}
+            <span className="text-night-500">0{i + 1}</span>
+            {e.titulo}
           </button>
         ))}
       </div>
 
       {/* consigna */}
-      <div className="rounded-2xl border border-night-700 bg-night-900/60 p-5">
+      <div className="rounded-sm border border-night-700/70 bg-night-900/60 p-5">
         <h2 className="text-lg font-bold text-night-50">{ejercicio.titulo}</h2>
         <p className="mt-1 text-sm leading-6 text-night-300">{ejercicio.consigna}</p>
         {!resultado && (
@@ -215,21 +221,27 @@ export default function Practice() {
       </div>
 
       {/* modo */}
-      <div className="mt-6 mb-4 flex flex-wrap gap-2">
+      <div className="mt-6 mb-4 flex flex-wrap gap-1.5">
         {MODOS.map((m) => {
           const Icono = m.icono
+          const meta = MODE_META[m.id]
           const activo = modo === m.id
           return (
             <button
               key={m.id}
               onClick={() => usarModo(m.id)}
-              className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`flex items-center gap-1.5 rounded-sm border-b-2 px-4 py-2 font-mono text-xs font-semibold uppercase tracking-wider transition-colors ${
                 activo
-                  ? 'border-neon-cyan/60 bg-neon-cyan/10 text-neon-cyan'
-                  : 'border-night-700 text-night-400 hover:border-night-500 hover:text-night-200'
+                  ? `${meta.text} border-current bg-night-900`
+                  : 'border-transparent text-night-400 hover:text-night-200'
               }`}
             >
-              <Icono size={15} className={m.color} />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: meta.fill }}
+                aria-hidden="true"
+              />
+              <Icono size={14} />
               {m.label}
             </button>
           )
@@ -253,14 +265,14 @@ export default function Practice() {
       <div className="mt-5 flex items-center gap-3">
         <button
           onClick={validar}
-          className="flex items-center gap-2 rounded-xl bg-linear-to-b from-neon-cyan to-fuchsia-500 px-8 py-3 text-sm font-black text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.3)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.5)]"
+          className="flex items-center gap-2 rounded-sm bg-linear-to-b from-neon-cyan to-fuchsia-500 px-8 py-3 font-mono text-xs font-black uppercase tracking-wider text-night-950 shadow-[0_0_24px_rgba(34,211,238,0.3)] transition-all hover:shadow-[0_0_36px_rgba(34,211,238,0.5)]"
         >
           <Check size={16} />
           Validar solución
         </button>
         <button
           onClick={() => setVerSolucion((v) => !v)}
-          className="flex items-center gap-2 rounded-xl border border-night-700 px-4 py-2.5 text-sm font-medium text-night-300 transition-colors hover:border-night-500 hover:text-night-100"
+          className="flex items-center gap-2 rounded-sm border border-night-700 px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider text-night-300 transition-colors hover:border-night-500 hover:text-night-100"
         >
           <Eye size={15} />
           {verSolucion ? 'Ocultar pista' : 'Ver pista'}
@@ -269,7 +281,7 @@ export default function Practice() {
 
       {/* resultados */}
       {resultado && !resultado.ok && (
-        <div className="mt-6 rounded-xl border border-neon-red/40 bg-neon-red/5 p-4">
+        <div className="mt-6 rounded-sm border border-neon-red/40 bg-neon-red/5 p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-bold text-neon-red">
             <X size={16} />
             Tu solución aún no es válida
@@ -282,7 +294,7 @@ export default function Practice() {
 
       {resultado && resultado.ok && (
         <div className="mt-6 space-y-5">
-          <div className="rounded-xl border border-neon-green/40 bg-neon-green/5 p-4">
+          <div className="rounded-sm border border-neon-green/40 bg-neon-green/5 p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-bold text-neon-green">
               <Check size={16} />
               ¡Tu solución es válida!
@@ -302,7 +314,7 @@ export default function Practice() {
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-bold text-night-200">
+            <h3 className="mb-2 font-heading text-xl font-bold uppercase tracking-wide text-night-200">
               Tu algoritmo en las 4 representaciones
             </h3>
             <FourWays programa={resultado.ir} defaultTab={modo} />

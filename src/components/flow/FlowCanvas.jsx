@@ -1,12 +1,24 @@
+<<<<<<< HEAD
 import { useCallback, useEffect, useMemo } from 'react'
+=======
+import { useCallback, useMemo, useRef } from 'react'
+>>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
   MarkerType,
+<<<<<<< HEAD
   useReactFlow,
+=======
+  Panel,
+  useReactFlow,
+  getViewportForBounds,
+>>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 } from '@xyflow/react'
+import { toPng } from 'html-to-image'
+import { Download } from 'lucide-react'
 import '@xyflow/react/dist/style.css'
 import { nodeTypes } from './nodeTypes.jsx'
 
@@ -18,6 +30,7 @@ const defaultEdgeOptions = {
   markerEnd: { type: MarkerType.ArrowClosed, color: COLOR_ARROW },
 }
 
+<<<<<<< HEAD
 // Reencuadra cuando cambia la clave (por ejemplo, al regenerar el diagrama) sin
 // reaccionar a mover los nodos, para no interrumpir al usuario mientras arrastra.
 function Reencuadrar({ fitKey }) {
@@ -28,6 +41,51 @@ function Reencuadrar({ fitKey }) {
     return () => clearTimeout(t)
   }, [fitKey, fitView])
   return null
+=======
+function DescargarDiagrama({ contenedorRef }) {
+  const { getNodes, getNodesBounds } = useReactFlow()
+
+  const descargar = useCallback(async () => {
+    const viewportEl = contenedorRef.current?.querySelector('.react-flow__viewport')
+    if (!viewportEl) return
+    try {
+      const bounds = getNodesBounds(getNodes())
+      const pad = 60
+      const ancho = Math.round(Math.max(bounds.width + pad * 2, 400))
+      const alto = Math.round(Math.max(bounds.height + pad * 2, 300))
+      const viewport = getViewportForBounds(bounds, ancho, alto, 0.25, 2, 0)
+      const dataUrl = await toPng(viewportEl, {
+        backgroundColor: '#07070d',
+        width: ancho,
+        height: alto,
+        style: {
+          width: `${ancho}px`,
+          height: `${alto}px`,
+          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+        },
+      })
+      const enlace = document.createElement('a')
+      enlace.download = 'diagrama-de-flujo.png'
+      enlace.href = dataUrl
+      enlace.click()
+    } catch {
+      // captura fallida: se ignora silenciosamente
+    }
+  }, [contenedorRef, getNodes, getNodesBounds])
+
+  return (
+    <Panel position="top-right">
+      <button
+        onClick={descargar}
+        title="Descargar el diagrama como imagen PNG"
+        className="flex items-center gap-1.5 rounded-sm border border-night-600 bg-night-900/90 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-night-300 transition-colors hover:border-neon-cyan/50 hover:text-neon-cyan"
+      >
+        <Download size={12} />
+        Export PNG
+      </button>
+    </Panel>
+  )
+>>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 }
 
 export default function FlowCanvas({
@@ -40,8 +98,13 @@ export default function FlowCanvas({
   onNodeDoubleClick,
   minHeight = 380,
   fitView = true,
+<<<<<<< HEAD
   fitKey,
+=======
+  className = '',
+>>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
 }) {
+  const contenedorRef = useRef(null)
   const handleNodesChange = useCallback(
     (changes) => {
       if (onNodesChangeExt) onNodesChangeExt(changes)
@@ -79,7 +142,8 @@ export default function FlowCanvas({
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl border border-night-700 bg-[#08080f]"
+      ref={contenedorRef}
+      className={`relative overflow-hidden rounded-sm border border-night-700/70 bg-night-950 ${className}`}
       style={{ height: minHeight, width: '100%' }}
     >
       <ReactFlow
@@ -101,9 +165,13 @@ export default function FlowCanvas({
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="#1b2331" />
+        <Background variant={BackgroundVariant.Lines} gap={20} size={1} color="rgba(34,211,238,0.08)" />
         <Controls showInteractive={false} className="bg-night-900! border! border-night-700!" />
+<<<<<<< HEAD
         <Reencuadrar fitKey={fitKey} />
+=======
+        <DescargarDiagrama contenedorRef={contenedorRef} />
+>>>>>>> 00245904bb47eb0388cefd94dda6c47088d6e809
       </ReactFlow>
     </div>
   )
