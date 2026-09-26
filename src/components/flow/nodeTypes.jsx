@@ -13,7 +13,14 @@ const ESTILOS = {
   salida: { border: 'border-neon-amber', bg: 'bg-neon-amber/10', text: 'text-neon-amber' },
   decision: { border: 'border-neon-cyan', bg: 'bg-neon-cyan/10', text: 'text-neon-cyan' },
   switch: { border: 'border-neon-purple', bg: 'bg-neon-purple/10', text: 'text-neon-purple' },
+  subprograma: { border: 'border-neon-purple', bg: 'bg-neon-purple/10', text: 'text-neon-purple' },
+  devolver: { border: 'border-neon-magenta', bg: 'bg-neon-magenta/10', text: 'text-neon-magenta' },
+  finFuncion: { border: 'border-neon-purple', bg: 'bg-neon-purple/10', text: 'text-neon-purple' },
 }
+
+// Nodos que el motor genera y que nunca recibe ni emite aristas.
+const SIN_ARISTAS = new Set(['finFuncion'])
+const SIN_SALIDA = new Set(['finFuncion', 'devolver', 'subprograma'])
 
 function Formas({ data, id, selected, type }) {
   const [texto, setTexto] = useState(data.label ?? '')
@@ -45,8 +52,12 @@ function Formas({ data, id, selected, type }) {
 
   return (
     <div className="relative" style={s}>
-      <Handle type="target" position={Position.Top} className="h-2.5! w-2.5! border-2! border-night-950! bg-night-400!" />
-      <Handle type="target" position={Position.Left} id="t-left" className="h-2! w-2! border-2! border-night-950! bg-night-400! opacity-70!" />
+      {!SIN_ARISTAS.has(tipo) && (
+        <>
+          <Handle type="target" position={Position.Top} className="h-2.5! w-2.5! border-2! border-night-950! bg-night-400!" />
+          <Handle type="target" position={Position.Left} id="t-left" className="h-2! w-2! border-2! border-night-950! bg-night-400! opacity-70!" />
+        </>
+      )}
       {data.tipo === 'inicio' && (
         <div className={cx('flex h-full w-full items-center justify-center rounded-full border-2', est.border, est.bg, brillo)}>
           {data.editando ? input : <span className={cx('font-mono text-xs font-semibold', est.text)}>{data.label}</span>}
@@ -82,13 +93,34 @@ function Formas({ data, id, selected, type }) {
           </span>
         </div>
       )}
+      {data.tipo === 'subprograma' && (
+        <div className={cx('flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed', est.border, est.bg, brillo)}>
+          <span className="px-2 text-center font-mono text-[11px] leading-4">
+            <span className="opacity-60">Función</span>
+            <br />
+            <span className={est.text}>{data.label}</span>
+          </span>
+        </div>
+      )}
+      {data.tipo === 'devolver' && (
+        <div className={cx('flex h-full w-full items-center justify-center rounded-lg border-2', est.border, est.bg, brillo)}>
+          <span className={cx('px-2 text-center font-mono text-xs leading-4', est.text)}>{data.label}</span>
+        </div>
+      )}
+      {data.tipo === 'finFuncion' && (
+        <div className={cx('flex h-full w-full items-center justify-center rounded-full border-2 border-dashed', est.border, est.bg, brillo)}>
+          <span className={cx('px-2 text-center font-mono text-[11px] font-semibold', est.text)}>{data.label}</span>
+        </div>
+      )}
       {data.tipo === 'decision' && (
         <>
           <Handle type="source" position={Position.Left} id="s-left" className="h-2! w-2! border-2! border-night-950! bg-neon-cyan!" />
           <Handle type="source" position={Position.Right} id="s-right" className="h-2! w-2! border-2! border-night-950! bg-neon-cyan!" />
         </>
       )}
-      <Handle type="source" position={Position.Bottom} className="h-2.5! w-2.5! border-2! border-night-950! bg-neon-cyan!" />
+      {!SIN_SALIDA.has(tipo) && (
+        <Handle type="source" position={Position.Bottom} className="h-2.5! w-2.5! border-2! border-night-950! bg-neon-cyan!" />
+      )}
     </div>
   )
 }
@@ -157,4 +189,7 @@ export const nodeTypes = {
   salida: Formas,
   decision: Formas,
   switch: SwitchNode,
+  subprograma: Formas,
+  devolver: Formas,
+  finFuncion: Formas,
 }

@@ -89,8 +89,15 @@ export function descomillar(str) {
 // Convierte partes IR a una cadena legible: "texto", expr
 export function partesAString(partes) {
   return partes
-    .map((p) => (p.tipo === 'texto' ? `"${p.valor}"` : p.valor))
+    .map((p) => (p.tipo === 'texto' ? `"${escaparSaltos(p.valor)}"` : p.valor))
     .join(', ')
+}
+
+// Al revés de lo anterior: un texto que venía como \n vuelve a ser un salto real.
+export function desescaparPartes(partes) {
+  return partes.map((p) =>
+    p.tipo === 'texto' ? { ...p, valor: unescaparSaltos(p.valor) } : p,
+  )
 }
 
 // Nombres de tipos en español
@@ -99,6 +106,7 @@ export const TIPO_NOMBRE = {
   float: 'real',
   char: 'caracter',
   string: 'cadena',
+  bool: 'booleano',
 }
 
 export const NOMBRE_A_TIPO = {
@@ -111,6 +119,22 @@ export const NOMBRE_A_TIPO = {
   char: 'char',
   string: 'string',
   entera: 'int',
+  booleano: 'bool',
+  logico: 'bool',
+  bool: 'bool',
+}
+
+// Tipos de retorno: los de variable más "nada" para los procedimientos.
+export const RETORNO_NOMBRE = {
+  ...TIPO_NOMBRE,
+  void: 'nada',
+}
+
+export const NOMBRE_A_RETORNO = {
+  ...NOMBRE_A_TIPO,
+  nada: 'void',
+  vacio: 'void',
+  void: 'void',
 }
 
 export function tipoNombre(tipo) {
@@ -119,4 +143,22 @@ export function tipoNombre(tipo) {
 
 export function tipoDesdeNombre(nombre) {
   return NOMBRE_A_TIPO[nombre.toLowerCase()] ?? 'int'
+}
+
+export function retornoNombre(retorno) {
+  return RETORNO_NOMBRE[retorno] ?? retorno
+}
+
+export function retornoDesdeNombre(nombre) {
+  return NOMBRE_A_RETORNO[nombre.toLowerCase()] ?? 'int'
+}
+
+// Un salto de línea dentro de un texto rompería la línea "Mostrar ..." en varias,
+// así que en los lenguajes de texto se escribe como la secuencia visible \n.
+export function escaparSaltos(texto) {
+  return texto.replace(/\n/g, '\\n')
+}
+
+export function unescaparSaltos(texto) {
+  return texto.replace(/\\n/g, '\n')
 }

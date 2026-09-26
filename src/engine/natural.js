@@ -3,13 +3,17 @@
 // (plantillas controladas, en español)
 // ============================================================
 
-import { programaDesde } from './ir.js'
+import { programaDesde, parametro } from './ir.js'
 import {
   normalizarLinea,
   quitarConector,
   partesDesdeCadena,
   tipoNombre,
   tipoDesdeNombre,
+  retornoNombre,
+  retornoDesdeNombre,
+  escaparSaltos,
+  desescaparPartes,
 } from './textutils.js'
 
 // ---------------- generador ----------------
@@ -66,8 +70,23 @@ function listaNatural(items) {
 
 function partesNaturales(partes) {
   return partes
-    .map((p) => (p.tipo === 'texto' ? `"${p.valor}"` : `el valor de ${p.valor}`))
+    .map((p) => (p.tipo === 'texto' ? `"${escaparSaltos(p.valor)}"` : `el valor de ${p.valor}`))
     .join(', ')
+}
+
+function paramNatural(p) {
+  return `${p.nombre} ${p.referencia ? 'por referencia ' : ''}de tipo ${tipoNombre(p.tipo)}`
+}
+
+function funcionNatural(paso, nivel, sangria) {
+  const params = paso.parametros.length ? paso.parametros.map(paramNatural).join(', ') : 'nada'
+  const retorno = retornoNombre(paso.retorno)
+  const lineas = [
+    `${sangria}Definir la función ${paso.nombre} (${params}) que devuelve ${retorno}:`,
+  ]
+  lineas.push(...naturalDesdePasos(paso.cuerpo, nivel + 1))
+  lineas.push(`${sangria}Fin de la función.`)
+  return lineas
 }
 
 export function naturalDesdePrograma(program) {
@@ -114,9 +133,25 @@ function naturalDesdePaso(paso, nivel, sangria) {
       return [`${sangria}Salir del ciclo.`]
     case 'continue':
       return [`${sangria}Continuar.`]
+    case 'llamar':
+      return [`${sangria}${llamarNatural(paso)}`]
+    case 'devolver':
+      return [
+        paso.valor == null
+          ? `${sangria}Devolver nada.`
+          : `${sangria}Devolver el valor de ${exprNatural(paso.valor)}.`,
+      ]
+    case 'funcion':
+      return funcionNatural(paso, nivel, sangria)
     default:
       return []
   }
+}
+
+function llamarNatural(paso) {
+  if (!paso.argumentos.length) return `Llamar a la función ${paso.nombre} sin argumentos.`
+  const args = paso.argumentos.map((a) => `el valor de ${a}`).join(' y ')
+  return `Llamar a la función ${paso.nombre} con los valores de ${args}.`
 }
 
 function asignarNatural(paso, sangria) {
@@ -253,9 +288,30 @@ function exprDesdeNatural(e) {
 }
 
 function partesDesdeNatural(cadena) {
-  return partesDesdeCadena(cadena).map((p) =>
+  return desescaparPartes(partesDesdeCadena(cadena)).map((p) =>
     p.tipo === 'expr' ? { ...p, valor: p.valor.replace(/^el\s+valor\s+de\s+/i, '') } : p,
   )
+}
+
+// "Definir la función esPrimo (n de tipo entero) que devuelve booleano:"
+function parsearCabeceraFuncionNatural(linea) {
+  const m = /^definir\s+la\s+funci[óo]n\s+([A-Za-z_]\w*)\s*\((.*)\)\s*que\s+devuelve\s+(.+?):?$/i.exec(
+    linea.trim(),
+  )
+  if (!m) throw new Error(`Definición de función no válida: "${linea}"`)
+  const [, nombre, listaParams, retorno] = m
+  const trimmed = listaParams.trim()
+  const parametros = !trimmed || /^nada$/i.test(trimmed)
+    ? []
+    : trimmed.split(',').map((p) => p.trim()).filter(Boolean).map(parsearParametroNatural)
+  return { nombre, retorno: retornoDesdeNombre(retorno.trim()), parametros }
+}
+
+// "a por referencia de tipo entero"
+function parsearParametroNatural(texto) {
+  const m = /^([A-Za-z_]\w*)\s+(por\s+referencia\s+)?de\s+tipo\s+(.+)$/i.exec(texto)
+  if (!m) throw new Error(`Parámetro no válido: "${texto}"`)
+  return parametro(m[1], tipoDesdeNombre(m[3].trim()), Boolean(m[2]))
 }
 
 export function irDesdeNatural(source) {
@@ -297,6 +353,7 @@ function esFinDeBloque(linea) {
     baja === 'fin de la repeticion' ||
     baja === 'fin repetir' ||
     /^fin\s+(del\s+)?(mientras|para|seg[uú]n|switch)\.?$/i.test(baja) ||
+    /^fin\s+de\s+la\s+funci[óo]n\.?$/i.test(baja) ||
     /^(en\s+caso\s+contrario|si\s+no|sino):?$/i.test(baja) ||
     /^en\s+caso\s+de\s+/i.test(baja) ||
     baja.startsWith('y repetir mientras')
@@ -392,6 +449,33 @@ function parsearLinea(ctx, linea) {
   if (/^(continuar|continue)$/i.test(linea)) {
     ctx.i++
     return { type: 'continue' }
+  }
+  if (/^definir\s+la\s+funci[óo]n\b/i.test(baja)) {
+    const cab = parsearCabeceraFuncionNatural(linea)
+    ctx.i++
+    const cuerpo = parsearBloque(ctx)
+    if (hayLinea(ctx) && /^fin\s+de\s+la\s+funci[óo]n\.?$/i.test(lineaActual(ctx))) ctx.i++
+    return { type: 'funcion', ...cab, cuerpo }
+  }
+  const llamar = /^llamar\s+a\s+la\s+funci[óo]n\s+([A-Za-z_]\w*)\s*(sin\s+argumentos|con\s+los\s+valores\s+de\s+(.+))?\.?$/i.exec(
+    linea,
+  )
+  if (llamar) {
+    ctx.i++
+    const argumentos = (llamar[3] ?? '')
+      .split(/\s*,\s*|\s+y\s+/)
+      .map((a) => a.replace(/^el\s+valor\s+de\s+/i, '').trim())
+      .filter(Boolean)
+    return { type: 'llamar', nombre: llamar[1], argumentos }
+  }
+  if (/^devolver\b/i.test(baja)) {
+    ctx.i++
+    const resto = linea
+      .replace(/^Devolver\s*/i, '')
+      .replace(/\.$/, '')
+      .replace(/^el\s+valor\s+de\s+/i, '')
+      .trim()
+    return { type: 'devolver', valor: !resto || /^nada$/i.test(resto) ? null : exprDesdeNatural(resto) }
   }
   if (baja.startsWith('declarar ')) {
     ctx.i++

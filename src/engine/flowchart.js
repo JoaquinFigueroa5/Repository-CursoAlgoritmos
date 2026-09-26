@@ -2,11 +2,8 @@
 // flowchart.js — Diagrama de flujo: IR <-> grafo (React Flow)
 // ============================================================
 
-import {
-  programa,
-  programaDesde,
-} from './ir.js'
-import { partesDesdeCadena } from './textutils.js'
+import { programa, programaDesde, nFuncion } from './ir.js'
+import { partesDesdeCadena, desescaparPartes, escaparSaltos } from './textutils.js'
 
 // -------- constantes de geometría --------
 export const NODE_SIZES = {
@@ -17,10 +14,15 @@ export const NODE_SIZES = {
   salida: { w: 180, h: 64 },
   decision: { w: 190, h: 100 },
   switch: { w: 200, h: 90 },
+  subprograma: { w: 240, h: 66 },
+  devolver: { w: 180, h: 58 },
+  finFuncion: { w: 180, h: 58 },
 }
 const GAP_V = 66
 const GAP_BRANCH = 250
 const GAP_LOOP = 250
+const COLUMNA_FUNCIONES = 660
+const GAP_FUNCIONES = 130
 
 let idC = 0
 const nid = () => `n${++idC}`
@@ -28,14 +30,15 @@ const eid = () => `e${++idC}`
 
 function makeNode(id, x, y, type, label, extra = {}) {
   const size = NODE_SIZES[type]
+  const { data: extraData, ...resto } = extra
   return {
     id,
     type,
     position: { x: x - size.w / 2, y },
-    data: { label, size, tipo: type },
+    data: { label, size, tipo: type, ...extraData },
     sourcePosition: 'bottom',
     targetPosition: 'top',
-    ...extra,
+    ...resto,
   }
 }
 
@@ -45,8 +48,60 @@ function makeNode(id, x, y, type, label, extra = {}) {
 
 export function flujoDesdePrograma(program) {
   idC = 0
-  const { nodes, edges } = layoutSecuencia(program.pasos, 400, 0)
+  // Las funciones se dibujan desplegadas en su propia columna, para que el flujo de
+  // main no se mezcle con ellas pero cada procedimiento se pueda leer completo.
+  const funciones = program.pasos.filter((p) => p.type === 'funcion')
+  const principal = program.pasos.filter((p) => p.type !== 'funcion')
+  const { nodes, edges } = layoutSecuencia(principal, 400, 0)
+  let yFunc = 0
+  for (const f of funciones) {
+    const L = layoutFuncion(f, 400 + COLUMNA_FUNCIONES, yFunc)
+    nodes.push(...L.nodes)
+    edges.push(...L.edges)
+    yFunc += L.h + GAP_FUNCIONES
+  }
   return { nodes, edges }
+}
+
+// Una función es cabecera -> cuerpo -> "Fin Funcion". El cuerpo se dibuja con el
+// mismo motor que main, así que un return es un nodo `devolver` como cualquier otro.
+function layoutFuncion(f, x0, y0) {
+  const headerId = nid()
+  const finId = nid()
+  const cuerpoY = y0 + NODE_SIZES.subprograma.h + GAP_V
+  const L = layoutSecuencia(f.cuerpo, x0, cuerpoY)
+  const finY = cuerpoY + L.h + GAP_V
+
+  const nodes = [
+    makeNode(headerId, x0, y0, 'subprograma', etiquetaFuncion(f), {
+      // Solo la firma: el cuerpo se reconstruye desde el grafo, que es la fuente
+      // de verdad cuando el usuario edita el diagrama.
+      data: { funcion: { nombre: f.nombre, parametros: f.parametros, retorno: f.retorno } },
+    }),
+    makeNode(finId, x0, finY, 'finFuncion', 'Fin Funcion'),
+  ]
+  const edges = [...L.edges]
+  if (L.entry) {
+    edges.push({ id: eid(), source: headerId, target: L.entry.id })
+  } else {
+    edges.push({ id: eid(), source: headerId, target: finId })
+  }
+  for (const ex of L.exits) {
+    // Sin cuerpo no hay salida real. Un `Devolver` final sí se une al "Fin Funcion":
+    // el camino de datos se cierra ahí, pero la función necesita su terminador.
+    if (ex.id === '__entry__') continue
+    edges.push({ id: eid(), source: ex.id, target: finId, ...(ex.label ? { label: ex.label } : {}) })
+  }
+  nodes.push(...L.nodes)
+  return { nodes, edges, h: finY + NODE_SIZES.finFuncion.h - y0 }
+}
+
+function etiquetaFuncion(f) {
+  const params = f.parametros
+    .map((p) => `${p.nombre}: ${tipoNombreLocal(p.tipo)}${p.referencia ? ' (E/S)' : ''}`)
+    .join(', ')
+  const retorno = f.retorno === 'void' ? 'nada' : tipoNombreLocal(f.retorno)
+  return `${f.nombre}(${params}) : ${retorno}`
 }
 
 export function altoDelFlujo(nodes) {
@@ -67,6 +122,8 @@ function layoutSecuencia(pasos, x0, y0) {
     edges.push(...L.edges)
     for (const pe of prevExits) {
       if (pe.id === '__entry__') continue
+      // Un `Devolver` cierra el camino: no se encadena con la instrucción que sigue.
+      if (pe.terminal) continue
       edges.push({
         id: eid(),
         source: pe.id,
@@ -114,8 +171,86 @@ function layoutPaso(paso, x0, y0) {
       return layoutSimple(x0, y0, 'proceso', 'Salir del ciclo')
     case 'continue':
       return layoutSimple(x0, y0, 'proceso', 'Continuar')
+    case 'llamar':
+      return layoutSimple(x0, y0, 'proceso', `Llamar ${paso.nombre}(${paso.argumentos.join(', ')})`)
+    case 'devolver':
+      return layoutSimple(x0, y0, 'devolver', `Devolver ${paso.valor ? paso.valor : 'nada'}`)
     default:
       return layoutSimple(x0, y0, 'proceso', '')
+  }
+}
+
+// Nodos que cierran un camino: no tienen salida y no se usan como punto de unión.
+const TIPOS_TERMINALES = new Set(['devolver', 'fin', 'finFuncion'])
+// `Devolver` corta el camino; `Fin` y `Fin Funcion` solo marcan el final del
+// componente, así que siguen siendo puntos de confluencia válidos.
+function esDevolucion(id, nodes) {
+  return nodes.find((n) => n.id === id)?.type === 'devolver'
+}
+
+// Une las salidas vivas con un nodo. Un `Devolver` no se encadena: cierra su camino.
+function aristasDeSalida(exits, target, extra = {}) {
+  return exits
+    .filter((ex) => !ex.terminal)
+    .map((ex) => ({ id: eid(), source: ex.id, target, ...extra }))
+}
+
+// Nodos sin salida que se pueden alcanzar desde un inicio, ignorando el límite
+// del recorrido (la decisión del ciclo al que se vuelve). Un `Devolver` es hoja
+// aunque tenga arista: por él no vuelve a fluir la ejecución.
+function hojasDe(inicio, adjacency, nodes, stopAt) {
+  const hojas = []
+  const pila = [inicio]
+  const visto = new Set()
+  while (pila.length) {
+    const u = pila.pop()
+    if (u == null || u === stopAt || visto.has(u)) continue
+    visto.add(u)
+    const out = adjacency[u] ?? []
+    if (out.length === 0 || esDevolucion(u, nodes)) {
+      hojas.push(u)
+      continue
+    }
+    for (const e of out) pila.push(e.target)
+  }
+  return hojas
+}
+
+function esRamaTerminal(inicio, adjacency, nodes, stopAt) {
+  const hojas = hojasDe(inicio, adjacency, nodes, stopAt)
+  return hojas.length > 0 && hojas.every((h) => esDevolucion(h, nodes))
+}
+
+// Una rama que acaba en `Devolver` no confluye con nadie: se cierra en sí misma y
+// la continuación la marcan las ramas que sí siguen. Devuelve dónde se cierra cada
+// rama (`stopPorRama`), el punto de unión común (`join`) y por dónde sigue el flujo
+// después de la construcción (`sigue`). Se usa solo cuando hay alguna rama terminal;
+// si ninguna lo es, todas confluyen como siempre.
+function resolverRamas(targets, adjacency, nodes, stopAt) {
+  const terminales = targets.map((t) => esRamaTerminal(t, adjacency, nodes, stopAt))
+  const idxVivas = targets.map((_, i) => (terminales[i] ? -1 : i)).filter((i) => i >= 0)
+  const alLimite = (i) => hojasDe(targets[i], adjacency, nodes, stopAt).length === 0
+  if (idxVivas.length >= 2) {
+    const join = calcularJoinMulti(idxVivas.map((i) => targets[i]), stopAt, adjacency)
+    if (!join) return null
+    return {
+      stopPorRama: targets.map((_, k) => (terminales[k] ? null : join)),
+      join,
+      sigue: join,
+    }
+  }
+  if (idxVivas.length === 1) {
+    const i = idxVivas[0]
+    const hojas = hojasDe(targets[i], adjacency, nodes, stopAt).filter((h) => !esDevolucion(h, nodes))
+    // Si la rama se funde con el límite del recorrido (la vuelta de un ciclo), su
+    // continuation es ese límite; si no, termina en su propia hoja.
+    const fin = hojas.length ? hojas[0] : alLimite(i) ? stopAt : null
+    return { stopPorRama: targets.map((_, k) => (k === i ? fin : null)), join: null, sigue: fin }
+  }
+  return {
+    stopPorRama: targets.map((_, k) => (alLimite(k) ? stopAt : null)),
+    join: null,
+    sigue: targets.some((_, k) => alLimite(k)) ? stopAt : null,
   }
 }
 
@@ -127,7 +262,7 @@ function layoutSimple(x0, y0, type, label) {
     edges: [],
     h: size.h,
     entry: { id },
-    exits: [{ id, label: null }],
+    exits: [{ id, label: null, terminal: type === 'devolver' }],
   }
 }
 
@@ -196,9 +331,7 @@ function layoutPara(paso, x0, y0) {
   const uId = nid()
   nodes.push(makeNode(uId, x0 + (Lbody ? GAP_LOOP : 0), uY, 'proceso', paso.actualizacion))
   if (Lbody) {
-    for (const ex of Lbody.exits) {
-      edges.push({ id: eid(), source: ex.id, target: uId })
-    }
+    edges.push(...aristasDeSalida(Lbody.exits, uId))
   } else {
     edges.push({ id: eid(), source: dId, target: uId, label: 'Sí', sourceHandle: 's-right', sourcePosition: 'right' })
   }
@@ -233,16 +366,11 @@ function layoutMientras(paso, x0, y0) {
       sourcePosition: 'right',
       targetPosition: 'top',
     })
-    for (const ex of Lbody.exits) {
-      edges.push({
-        id: eid(),
-        source: ex.id,
-        target: dId,
-        targetHandle: 't-left',
-        targetPosition: 'left',
-        animated: true,
-      })
-    }
+    edges.push(...aristasDeSalida(Lbody.exits, dId, {
+      targetHandle: 't-left',
+      targetPosition: 'left',
+      animated: true,
+    }))
   }
   const h = NODE_SIZES.decision.h + (Lbody?.h ? GAP_V + Lbody.h : 0)
   return { nodes, edges, h, entry: { id: dId }, exits: [{ id: dId, label: 'No' }] }
@@ -261,9 +389,7 @@ function layoutHacerMientras(paso, x0, y0) {
   const dId = nid()
   nodes.push(makeNode(dId, x0, dY, 'decision', paso.condicion))
   if (Lbody) {
-    for (const ex of Lbody.exits) {
-      edges.push({ id: eid(), source: ex.id, target: dId })
-    }
+    edges.push(...aristasDeSalida(Lbody.exits, dId))
     edges.push({
       id: eid(),
       source: dId,
@@ -325,13 +451,21 @@ function layoutSwitch(paso, x0, y0) {
   }
 }
 
-const TIPO_NOMBRE_LOCAL = { int: 'entero', float: 'real', char: 'caracter', string: 'cadena' }
+const TIPO_NOMBRE_LOCAL = {
+  int: 'entero',
+  float: 'real',
+  char: 'caracter',
+  string: 'cadena',
+  bool: 'booleano',
+}
 function tipoNombreLocal(t) {
   return TIPO_NOMBRE_LOCAL[t] ?? t
 }
 
 function partesLocal(partes) {
-  return partes.map((p) => (p.tipo === 'texto' ? `"${p.valor}"` : p.valor)).join(', ')
+  return partes
+    .map((p) => (p.tipo === 'texto' ? `"${escaparSaltos(p.valor)}"` : p.valor))
+    .join(', ')
 }
 
 // ============================================================
@@ -344,29 +478,39 @@ export function programaDesdeFlujo(nodes, edges) {
     if (!val.ok) return { ok: false, error: val.errores.join(' ') }
 
     const adjacency = construirGrafo(nodes, edges)
-    const inicios = nodes.filter((n) => n.type === 'inicio')
-    const inicioId = inicios[0].id
 
-    const loops = detectarLoops(nodes, adjacency)
-    const loopMap = {}
-    const absorbed = new Set()
-    for (const L of loops) {
-      loopMap[L.entryId] = L
-      if (L.initNodeId) absorbed.add(L.initNodeId)
-      if (L.updateNodeId) absorbed.add(L.updateNodeId)
+    // Cada función es un componente aparte: su firma viene del nodo cabecera y su
+    // cuerpo se lee del grafo, para respetar lo que el usuario haya editado.
+    const funciones = []
+    for (const cabecera of nodes.filter((n) => n.type === 'subprograma')) {
+      const meta = cabecera.data?.funcion
+      if (!meta) {
+        return {
+          ok: false,
+          error: `La función "${cabecera.data?.label ?? ''}" perdió su firma. Vuelve a convertir el código para regenerarla.`,
+        }
+      }
+      funciones.push(nFuncion(meta.nombre, meta.retorno, meta.parametros, recorrerComponente(cabecera, nodes, adjacency)))
     }
 
-    const result = walk(inicioId, new Set(), new Set(), null, {
-      nodes,
-      adjacency,
-      loopMap,
-      absorbed,
-    })
-    const pasos = result.pasos
-    return { ok: true, programa: programaDesde(pasos) }
+    const inicio = nodes.find((n) => n.type === 'inicio')
+    const pasos = inicio ? recorrerComponente(inicio, nodes, adjacency) : []
+    return { ok: true, programa: programaDesde([...funciones, ...pasos]) }
   } catch (err) {
     return { ok: false, error: err.message }
   }
+}
+
+function recorrerComponente(raiz, nodes, adjacency) {
+  const loops = detectarLoops(nodes, adjacency)
+  const loopMap = {}
+  const absorbed = new Set()
+  for (const L of loops) {
+    loopMap[L.entryId] = L
+    if (L.initNodeId) absorbed.add(L.initNodeId)
+    if (L.updateNodeId) absorbed.add(L.updateNodeId)
+  }
+  return walk(raiz.id, new Set(), new Set(), null, { nodes, adjacency, loopMap, absorbed }).pasos
 }
 
 function construirGrafo(nodes, edges) {
@@ -393,6 +537,13 @@ export function validarFlujo(nodes, edges) {
   if (fines.length === 0) errores.push('Falta al menos un nodo de Fin.')
 
   const adjacency = construirGrafo(nodes, edges)
+  // Nodos que pertenecen a una función: no se conectan a main, así que las reglas
+  // de alcanzabilidad se aplican a cada componente por separado.
+  const deFuncion = new Set()
+  for (const cabecera of nodes.filter((n) => n.type === 'subprograma')) {
+    for (const id of alcanzables(cabecera.id, adjacency)) deFuncion.add(id)
+  }
+
   for (const n of nodes) {
     const out = adjacency[n.id] ?? []
     if (n.type === 'decision' && out.length !== 2) {
@@ -404,33 +555,28 @@ export function validarFlujo(nodes, edges) {
         errores.push(`El Según "${n.data.label}" no puede tener más de una rama "De otro modo".`)
       }
     }
-    if (n.type !== 'decision' && n.type !== 'switch' && n.type !== 'fin' && out.length > 1) {
+    if (n.type !== 'decision' && n.type !== 'switch' && n.type !== 'fin' && n.type !== 'finFuncion' && out.length > 1) {
       errores.push(`El nodo "${n.data.label}" no puede tener más de una salida.`)
     }
-    if (out.length === 0 && n.type !== 'fin') {
+    if (out.length === 0 && !TIPOS_TERMINALES.has(n.type)) {
       errores.push(`El nodo "${n.data.label}" no tiene salida.`)
+    }
+    if (n.type === 'subprograma' && out.length !== 1) {
+      errores.push(`La función "${n.data.label}" debe conectarse con su cuerpo.`)
     }
   }
 
   // alcanzabilidad desde inicio
   if (inicios.length === 1) {
-    const inicioId = inicios[0].id
-    const visitados = new Set()
-    const pila = [inicioId]
-    while (pila.length) {
-      const u = pila.pop()
-      if (visitados.has(u)) continue
-      visitados.add(u)
-      for (const e of adjacency[u] ?? []) pila.push(e.target)
-    }
+    const visitados = alcanzables(inicios[0].id, adjacency)
     for (const n of nodes) {
-      if (!visitados.has(n.id)) {
-        errores.push(`El nodo "${n.data.label}" no está conectado al flujo.`)
-      }
+      if (visitados.has(n.id)) continue
+      if (deFuncion.has(n.id)) continue
+      errores.push(`El nodo "${n.data.label}" no está conectado al flujo.`)
     }
-    // todo nodo debe poder llegar a un Fin
+    // todo nodo debe poder llegar a un Fin (de main o de su función)
     for (const n of nodes) {
-      if (n.type === 'fin') continue
+      if (TIPOS_TERMINALES.has(n.type)) continue
       if (!puedeLlegarAFin(n.id, adjacency, nodes, new Set())) {
         errores.push(`El nodo "${n.data.label}" no lleva a un nodo de Fin.`)
       }
@@ -439,11 +585,24 @@ export function validarFlujo(nodes, edges) {
 
   // validación de textos
   for (const n of nodes) {
+    if (n.type === 'subprograma' || n.type === 'finFuncion') continue
     const err = validarTextoNodo(n)
     if (err) errores.push(err)
   }
 
   return { ok: errores.length === 0, errores }
+}
+
+function alcanzables(id, adjacency) {
+  const visitados = new Set()
+  const pila = [id]
+  while (pila.length) {
+    const u = pila.pop()
+    if (visitados.has(u)) continue
+    visitados.add(u)
+    for (const e of adjacency[u] ?? []) pila.push(e.target)
+  }
+  return visitados
 }
 
 function puedeLlegarAFin(id, adjacency, nodes, visitados) {
@@ -452,19 +611,43 @@ function puedeLlegarAFin(id, adjacency, nodes, visitados) {
   const out = adjacency[id] ?? []
   for (const e of out) {
     const target = nodes.find((n) => n.id === e.target)
-    if (target && target.type === 'fin') return true
+    if (target && TIPOS_TERMINALES.has(target.type)) return true
     if (puedeLlegarAFin(e.target, adjacency, nodes, visitados)) return true
   }
   return false
+}
+
+// `i++`, `i--`, `i += 2`, `i -= 2`
+function incrementoDe(label) {
+  let m = /^(\w+)\s*\+\+\s*$/.exec(label)
+  if (m) return { nombre: m[1], operacion: '+', cantidad: '1' }
+  m = /^(\w+)\s*--\s*$/.exec(label)
+  if (m) return { nombre: m[1], operacion: '-', cantidad: '1' }
+  m = /^(\w+)\s*\+=\s*(.+)$/.exec(label)
+  if (m) return { nombre: m[1], operacion: '+', cantidad: m[2].trim() }
+  m = /^(\w+)\s*-=\s*(.+)$/.exec(label)
+  if (m) return { nombre: m[1], operacion: '-', cantidad: m[2].trim() }
+  return null
+}
+
+// `i = 2` o `int i = 2`: devuelve el nombre de la variable, no el tipo.
+function asignacionSimple(label) {
+  let m = /^(\w+)\s*=\s*(.+)$/.exec(label)
+  if (m) return { nombre: m[1], valor: m[2].trim() }
+  m = /^(?:int|float|double|char|long|short|bool|string|auto|var)\s+(\w+)\s*=\s*(.+)$/i.exec(label)
+  if (m) return { nombre: m[1], valor: m[2].trim() }
+  return null
 }
 
 function validarTextoNodo(n) {
   const label = (n.data.label || '').trim()
   if (n.type === 'proceso') {
     if (!label) return `El proceso sin texto debe tener una asignación (ej. "x = 5").`
+    if (/^Llamar\s+[A-Za-z_][A-Za-z0-9_]*\s*\(.*\)$/.test(label)) return null
     if (
       !/^Declarar\s+/i.test(label) &&
       !label.includes('=') &&
+      !incrementoDe(label) &&
       !/^\/\/\s*sin\s+instrucciones$/i.test(label) &&
       !/^Salir\s+del\s+ciclo\.?$/i.test(label) &&
       !/^(Continuar|Continue)\.?$/i.test(label)
@@ -526,6 +709,17 @@ function detectarLoops(nodes, adjacency) {
   return loops
 }
 
+// ¿Algún nodo que no pertenece al ciclo apunta a este nodo?
+function tienePredecesorFuera(id, ciclo, nodes, adjacency) {
+  for (const n of nodes) {
+    if (ciclo.has(n.id)) continue
+    for (const e of adjacency[n.id] ?? []) {
+      if (e.target === id) return true
+    }
+  }
+  return false
+}
+
 function construirLoop(be, parent, nodes, adjacency) {
   // ciclo: camino target -> ... -> source (subiendo por parent)
   const ciclo = new Set()
@@ -539,11 +733,22 @@ function construirLoop(be, parent, nodes, adjacency) {
 
   const dTarget = nodes.find((n) => n.id === be.target)
   const dSource = nodes.find((n) => n.id === be.source)
-  const esDowhile = dSource?.type === 'decision'
-  const esMientras = !esDowhile && dTarget?.type === 'decision'
-  if (!esDowhile && !esMientras) return null
-  const decisionId = esDowhile ? be.source : be.target
-  const tipo = esDowhile ? 'dowhile' : 'mientras'
+  // La decisión del bucle es, en principio, aquel a la que vuelve el back-edge. Si
+  // además tiene un predecesor fuera del ciclo, el bucle es `mientras`/`para`; si
+  // no, la condición se evalúa al final del cuerpo (`hacer mientras`). El back-edge
+  // puede salir de un `Si` del cuerpo, así que solo se recurre a su origen cuando el
+  // destino no es una decisión.
+  let decisionId
+  let tipo
+  if (dTarget?.type === 'decision') {
+    decisionId = be.target
+    tipo = tienePredecesorFuera(be.target, ciclo, nodes, adjacency) ? 'mientras' : 'dowhile'
+  } else if (dSource?.type === 'decision') {
+    decisionId = be.source
+    tipo = 'dowhile'
+  } else {
+    return null
+  }
 
   const out = adjacency[decisionId] ?? []
   // borde de salida = el que no va al ciclo
@@ -559,7 +764,7 @@ function construirLoop(be, parent, nodes, adjacency) {
 
   const L = {
     id: `L${decisionId}`,
-    entryId: tipo === 'dowhile' ? be.target : decisionId,
+    entryId: tipo === 'dowhile' ? bodyStartId : decisionId,
     decisionId,
     bodyStartId,
     exitId,
@@ -581,13 +786,17 @@ function construirLoop(be, parent, nodes, adjacency) {
     const initNode = predecesoresExternos.length === 1 ? predecesoresExternos[0] : null
     const backSource = nodes.find((n) => n.id === be.source)
     if (initNode && backSource) {
-      const mInit = /^(\w+)\s*=\s*(.+)$/.exec(initNode.data.label || '')
-      const mUpd = /^(\w+)\s*=\s*\1\s*(?:\+|-)\s*(.+)$/.exec(backSource.data.label || '')
-      if (mInit && mUpd && mInit[1] === mUpd[1]) {
+      // La inicialización puede venir como "i = 2" o como "int i = 2" (así lo
+      // escribe el generador de C++), y la actualización como "i = i + 1" o "i++".
+      const init = asignacionSimple(initNode.data.label || '')
+      const rotuloUpdate = backSource.data.label || ''
+      const mUpd = /^(\w+)\s*=\s*\1\s*(?:\+|-)\s*(.+)$/.exec(rotuloUpdate)
+      const nombreUpdate = mUpd ? mUpd[1] : incrementoDe(rotuloUpdate)?.nombre
+      if (init && nombreUpdate && init.nombre === nombreUpdate) {
         L.tipo = 'para'
         L.initNodeId = initNode.id
         L.initText = initNode.data.label
-        L.updateText = backSource.data.label
+        L.updateText = rotuloUpdate
         L.updateNodeId = backSource.id
       }
     }
@@ -683,7 +892,7 @@ function walk(id, path, suppress, stopAt, ctx) {
   if (id === stopAt) return { pasos: [], nextId: stopAt }
   const node = ctx.nodes.find((n) => n.id === id)
   if (!node) return { pasos: [], nextId: null }
-  if (node.type === 'fin') return { pasos: [], nextId: null }
+  if (node.type === 'fin' || node.type === 'finFuncion') return { pasos: [], nextId: null }
 
   const L = ctx.loopMap[id]
   if (L && !suppress.has(L.id)) {
@@ -722,16 +931,32 @@ function walk(id, path, suppress, stopAt, ctx) {
       }
     }
     const starts = out.map((e) => e.target)
-    const join = calcularJoinMulti(starts, stopAt, ctx.adjacency)
-    if (!join) {
-      throw new Error(`No se encuentra el punto donde se unen las ramas del Según "${expr}".`)
+    const hayTerminal = starts.some((s) => esRamaTerminal(s, ctx.adjacency, ctx.nodes, stopAt))
+    let stopPorRama
+    let sigue = null
+    if (hayTerminal) {
+      // Con un caso que termina en `Devolver` no hay confluencia común: cada rama
+      // se cierra en su propio punto y la continuación la marca la que sigue.
+      const r = resolverRamas(starts, ctx.adjacency, ctx.nodes, stopAt)
+      if (!r) {
+        throw new Error(`No se encuentra el punto donde se unen las ramas del Según "${expr}".`)
+      }
+      stopPorRama = r.stopPorRama
+      sigue = r.sigue
+    } else {
+      const join = calcularJoinMulti(starts, stopAt, ctx.adjacency)
+      if (!join) {
+        throw new Error(`No se encuentra el punto donde se unen las ramas del Según "${expr}".`)
+      }
+      stopPorRama = starts.map(() => join)
     }
     const casos = []
     let defecto = []
-    for (const e of out) {
+    for (let i = 0; i < out.length; i++) {
+      const e = out[i]
       const etiqueta = (e.label || '').trim()
       const esDefault = /^(de\s+otro\s+modo|default)$/i.test(etiqueta)
-      const res = walk(e.target, new Set([...path, id]), suppress, join, ctx)
+      const res = walk(e.target, new Set([...path, id]), suppress, stopPorRama[i], ctx)
       const pasos = res.pasos
       if (esDefault) {
         defecto = pasos
@@ -743,7 +968,7 @@ function walk(id, path, suppress, stopAt, ctx) {
       }
     }
     const paso = { type: 'switch', expresion: expr, casos, defecto }
-    const next = walk(join, path, suppress, stopAt, ctx)
+    const next = sigue ? walk(sigue, path, suppress, stopAt, ctx) : { pasos: [], nextId: null }
     return { pasos: [paso, ...next.pasos], nextId: next.nextId }
   }
 
@@ -751,8 +976,27 @@ function walk(id, path, suppress, stopAt, ctx) {
     if (out.length !== 2) throw new Error(`La decisión "${node.data.label}" debe tener dos salidas.`)
     const tE = edgeTrue(out)
     const fE = edgeFalse(out)
-    if (path.has(tE.target) || path.has(fE.target)) {
+    // Volver a la decisión del ciclo al que pertenece el `Si` es válido: solo es un
+    // ciclo no reconocido cuando la salida apunta a un nodo ya recorrido que no
+    // es el límite del recorrido actual.
+    if ((path.has(tE.target) && tE.target !== stopAt) || (path.has(fE.target) && fE.target !== stopAt)) {
       throw new Error(`No se pudo convertir el diagrama: ciclo no reconocido en "${node.data.label}".`)
+    }
+    const condicion = node.data.label.trim()
+    const p2 = new Set([...path, id])
+    const hayTerminal =
+      esRamaTerminal(tE.target, ctx.adjacency, ctx.nodes, stopAt) ||
+      esRamaTerminal(fE.target, ctx.adjacency, ctx.nodes, stopAt)
+    if (hayTerminal) {
+      const r = resolverRamas([tE.target, fE.target], ctx.adjacency, ctx.nodes, stopAt)
+      if (!r) {
+        throw new Error(`No se encuentra el punto donde se unen las ramas del Si "${condicion}".`)
+      }
+      const tRes = walk(tE.target, p2, suppress, r.stopPorRama[0], ctx)
+      const fRes = walk(fE.target, p2, suppress, r.stopPorRama[1], ctx)
+      const paso = { type: 'si', condicion, entonces: tRes.pasos, siNo: fRes.pasos }
+      const next = r.sigue ? walk(r.sigue, path, suppress, stopAt, ctx) : { pasos: [], nextId: null }
+      return { pasos: [paso, ...next.pasos], nextId: next.nextId }
     }
     const join = calcularJoin(tE.target, fE.target, stopAt, ctx.adjacency)
     if (!join) {
@@ -820,13 +1064,32 @@ function pasoDesdeNodo(node) {
   switch (node.type) {
     case 'inicio':
     case 'fin':
-      return null
+    case 'finFuncion':
     case 'decision':
+    case 'subprograma':
       return null
+    case 'devolver': {
+      const m = /^Devolver\s+(.*)$/i.exec(label)
+      const valor = m ? m[1].trim() : ''
+      return { type: 'devolver', valor: /^(nada|void)$/i.test(valor) ? '' : valor }
+    }
     case 'proceso': {
       if (/^\/\/\s*sin\s+instrucciones$/i.test(label)) return null
       if (/^Salir\s+del\s+ciclo\.?$/i.test(label)) return { type: 'break' }
       if (/^(Continuar|Continue)\.?$/i.test(label)) return { type: 'continue' }
+      const inc = incrementoDe(label)
+      if (inc) return { type: 'asignar', nombre: inc.nombre, valor: `${inc.nombre} ${inc.operacion} ${inc.cantidad}` }
+      const llamada = /^Llamar\s+([A-Za-z_]\w*)\s*\((.*)\)$/.exec(label)
+      if (llamada) {
+        const argumentos = llamada[2].trim()
+        return {
+          type: 'llamar',
+          nombre: llamada[1],
+          argumentos: argumentos
+            ? argumentos.split(',').map((a) => a.trim()).filter(Boolean)
+            : [],
+        }
+      }
       if (/^Declarar\s+/i.test(label)) {
         const contenido = label.replace(/^Declarar\s+/i, '')
         const m = /^(\w+)\s+como\s+(.+?)\s*=\s*(.+)$/i.exec(contenido)
@@ -848,14 +1111,25 @@ function pasoDesdeNodo(node) {
     }
     case 'salida': {
       const content = /^Mostrar\s+/i.test(label) ? label.replace(/^Mostrar\s+/i, '') : label
-      return { type: 'mostrar', partes: partesDesdeCadena(content) }
+      return { type: 'mostrar', partes: desescaparPartes(partesDesdeCadena(content)) }
     }
     default:
       return null
   }
 }
 
-const TIPO_NOMBRE_LOCAL_INV = { entero: 'int', real: 'float', caracter: 'char', cadena: 'string', int: 'int', float: 'float', char: 'char', string: 'string' }
+const TIPO_NOMBRE_LOCAL_INV = {
+  entero: 'int',
+  real: 'float',
+  caracter: 'char',
+  cadena: 'string',
+  int: 'int',
+  float: 'float',
+  char: 'char',
+  string: 'string',
+  booleano: 'bool',
+  bool: 'bool',
+}
 function tipoDesdeNombreLocal(nombre) {
   return TIPO_NOMBRE_LOCAL_INV[nombre.toLowerCase()] ?? 'int'
 }

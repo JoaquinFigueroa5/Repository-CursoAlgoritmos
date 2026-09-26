@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   CircleDot,
   Square,
@@ -18,6 +18,10 @@ import FlowCanvas from './FlowCanvas.jsx'
 
 let idSeq = 0
 const nid = () => `e${++idSeq}n`
+
+// Los nodos que el motor genera como estructura de una función no se borran desde
+// el lienzo: la función se edita completa desde el código.
+const PROTEGIDOS = new Set(['subprograma', 'finFuncion', 'devolver'])
 
 const PALETA = [
   { tipo: 'inicio', label: 'Inicio', icono: CircleDot, color: 'text-neon-cyan' },
@@ -42,6 +46,10 @@ const ETIQUETA_POR_TIPO = {
 export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
   const [sel, setSel] = useState(null)
 
+  // El reencuadre depende solo de qué nodos hay, no de sus posiciones: así no
+  // salta mientras el usuario arrastra.
+  const fitKey = useMemo(() => nodes.map((n) => n.id).join('|'), [nodes])
+
   const nodesConGuardar = nodes.map((n) => ({
     ...n,
     data: { ...n.data, onGuardar: guardarEtiqueta },
@@ -55,7 +63,14 @@ export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
   }
 
   const onNodesChange = (cambios) => {
-    const next = applyNodeChanges(cambios, nodes)
+    // La cabecera y el cierre de una función, y sus `Devolver`, los genera el
+    // motor: borrarlos rompería el diagrama, así que se ignoran.
+    const aplicables = cambios.filter((c) => {
+      if (c.type !== 'remove') return true
+      const nodo = nodes.find((n) => n.id === c.id)
+      return !PROTEGIDOS.has(nodo?.type)
+    })
+    const next = applyNodeChanges(aplicables, nodes)
     for (const c of cambios) {
       if (c.type === 'select' && !c.selected) {
         setSel((s) => (s && s.tipo === 'nodo' && s.id === c.id ? null : s))
@@ -77,6 +92,8 @@ export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
 
   const onConnect = (params) => {
     const origen = nodes.find((n) => n.id === params.source)
+    const destino = nodes.find((n) => n.id === params.target)
+    if (PROTEGIDOS.has(origen?.type) || PROTEGIDOS.has(destino?.type)) return
     onCambio(
       nodes,
       addEdge(
@@ -87,6 +104,9 @@ export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
   }
 
   const onNodeDoubleClick = (_, nodo) => {
+    // La cabecera de una función la genera el motor con su firma: no se renombra
+    // desde el lienzo, se edita desde el código.
+    if (PROTEGIDOS.has(nodo.type)) return
     onCambio(
       nodes.map((n) => (n.id === nodo.id ? { ...n, data: { ...n.data, editando: true } } : n)),
       edges,
@@ -146,6 +166,7 @@ export default function FlowEditor({ nodes, edges, onCambio, alto = 460 }) {
         onConnect={onConnect}
         onNodeDoubleClick={onNodeDoubleClick}
         minHeight={alto}
+        fitKey={fitKey}
       />
 
       <p className="text-xs leading-5 text-night-500">

@@ -1,9 +1,14 @@
 // ============================================================
 // cpp.js — Generador y parser de C++ (librería stdio.h)
+// Soporta: main, funciones, procedimientos, llamadas, return con
+//          valor, parámetros por referencia y varias variables por
+//          declaración. Lo que no reconoce lo descarta con un aviso.
 // ============================================================
 
 import {
   TIPOS,
+  RETORNO_VOID,
+  parametro,
   tablaDeSimbolos,
   programaDesde,
   parteTexto,
@@ -17,6 +22,12 @@ const TIPO_CPP = {
   [TIPOS.FLOAT]: 'float',
   [TIPOS.CHAR]: 'char',
   [TIPOS.STRING]: 'char[]',
+  [TIPOS.BOOL]: 'bool',
+}
+
+const TIPO_CPP_RETORNO = {
+  ...TIPO_CPP,
+  [RETORNO_VOID]: 'void',
 }
 
 const ESPECIFICADOR = {
@@ -24,7 +35,10 @@ const ESPECIFICADOR = {
   [TIPOS.FLOAT]: '%f',
   [TIPOS.CHAR]: '%c',
   [TIPOS.STRING]: '%s',
+  [TIPOS.BOOL]: '%d',
 }
+
+const SIN_INSTRUCCIONES = '// sin instrucciones'
 
 function tipoPorDefecto(expr) {
   if (/^\d+\.\d/.test(expr)) return TIPOS.FLOAT
@@ -44,14 +58,39 @@ function escaparFormato(texto) {
 
 export function cppDesdePrograma(program) {
   const tabla = tablaDeSimbolos(program)
-  const cuerpo = cppDesdePasos(program.pasos, tabla).trimEnd()
+  // Las funciones se emiten antes de main porque main necesita verlas declaradas.
+  const funciones = program.pasos.filter((p) => p.type === 'funcion')
+  const cuerpo = cppDesdePasos(
+    program.pasos.filter((p) => p.type !== 'funcion'),
+    tabla,
+  ).trimEnd()
+  const antes = funciones.length
+    ? funciones.map((f) => cppDesdeFuncion(f, tabla)).join('\n\n') + '\n\n'
+    : ''
+  const contenido = cuerpo ? indentar(cuerpo) : `    ${SIN_INSTRUCCIONES}`
   return `#include <stdio.h>
 
-int main() {
-${indentar(cuerpo)}
+${antes}int main() {
+${contenido}
     return 0;
 }
 `
+}
+
+function cppDesdeFuncion(paso, tabla) {
+  const params = paso.parametros.map(tipoParamCpp).join(', ')
+  // Los parámetros tienen ámbito propio: se siembran en la tabla para que los
+  // especificadores de printf/scanf salgan con el tipo correcto.
+  const tablaLocal = { ...tabla }
+  for (const p of paso.parametros) tablaLocal[p.nombre] = p.tipo
+  const cuerpo = cppDesdePasos(paso.cuerpo, tablaLocal)
+  const retorno = TIPO_CPP_RETORNO[paso.retorno] ?? TIPO_CPP[paso.retorno] ?? 'int'
+  return `${retorno} ${paso.nombre}(${params}) {\n${cuerpo ? indentar(cuerpo) : `    ${SIN_INSTRUCCIONES}`}\n}`
+}
+
+function tipoParamCpp(p) {
+  const base = TIPO_CPP[p.tipo] ?? 'int'
+  return p.referencia ? `${base} &${p.nombre}` : `${base} ${p.nombre}`
 }
 
 function cppDesdePasos(pasos, tabla) {
@@ -88,6 +127,12 @@ function cppDesdePaso(paso, tabla) {
       return 'break;'
     case 'continue':
       return 'continue;'
+    case 'llamar':
+      return `${paso.nombre}(${paso.argumentos.join(', ')});`
+    case 'devolver':
+      return paso.valor == null ? 'return;' : `return ${paso.valor};`
+    case 'funcion':
+      return cppDesdeFuncion(paso, tabla)
     default:
       return null
   }
@@ -133,7 +178,7 @@ function mostrarCpp(paso, tabla) {
 function siCpp(paso, tabla) {
   const entonces = cppDesdePasos(paso.entonces, tabla)
   const siNo = cppDesdePasos(paso.siNo, tabla)
-  const cuerpo = entonces ? indentar(entonces) : '// sin instrucciones'
+  const cuerpo = entonces ? indentar(entonces) : SIN_INSTRUCCIONES
   let out = `if (${paso.condicion}) {\n${cuerpo}\n}`
   if (siNo) {
     out += ` else {\n${indentar(siNo)}\n}`
@@ -143,19 +188,19 @@ function siCpp(paso, tabla) {
 
 function paraCpp(paso, tabla) {
   const cuerpo = cppDesdePasos(paso.cuerpo, tabla)
-  const contenido = cuerpo ? indentar(cuerpo) : '// sin instrucciones'
+  const contenido = cuerpo ? indentar(cuerpo) : SIN_INSTRUCCIONES
   return `for (${paso.inicializacion}; ${paso.condicion}; ${paso.actualizacion}) {\n${contenido}\n}`
 }
 
 function mientrasCpp(paso, tabla) {
   const cuerpo = cppDesdePasos(paso.cuerpo, tabla)
-  const contenido = cuerpo ? indentar(cuerpo) : '// sin instrucciones'
+  const contenido = cuerpo ? indentar(cuerpo) : SIN_INSTRUCCIONES
   return `while (${paso.condicion}) {\n${contenido}\n}`
 }
 
 function hacerMientrasCpp(paso, tabla) {
   const cuerpo = cppDesdePasos(paso.cuerpo, tabla)
-  const contenido = cuerpo ? indentar(cuerpo) : '// sin instrucciones'
+  const contenido = cuerpo ? indentar(cuerpo) : SIN_INSTRUCCIONES
   return `do {\n${contenido}\n} while (${paso.condicion});`
 }
 
@@ -185,21 +230,44 @@ function indentar(texto) {
 // ---------------- parser ----------------
 
 export function irDesdeCPP(source) {
+  const avisos = []
   try {
     const limpio = limpiarComentariosEInclude(source)
-    const cuerpo = extraerCuerpoMain(limpio)
-    const pasos = parsearPasos(cuerpo, new ParserContext(), true)
-    return { ok: true, programa: programaDesde(pasos) }
+    const { funciones, cuerpoMain } = partirTopLevel(limpio, avisos)
+    const ctx = new ParserContext(avisos)
+    ctx.nombresFunciones = new Set(funciones.map((f) => f.nombre))
+    const pasosMain = cuerpoMain == null ? [] : quitarReturnFinal(leerPasos(cuerpoMain, ctx))
+    const nodosFuncion = funciones.map((f) => ({
+      type: 'funcion',
+      nombre: f.nombre,
+      retorno: retornoDesdeCpp(f.tipo),
+      parametros: leerParametros(f.params, ctx),
+      cuerpo: leerPasos(f.cuerpo, ctx),
+    }))
+    return { ok: true, programa: programaDesde([...nodosFuncion, ...pasosMain]), avisos }
   } catch (err) {
-    return { ok: false, error: err.stack ?? err.message }
+    return { ok: false, error: err.message, avisos }
   }
 }
 
+// El `return 0;` que el generador pone al final de main no es un paso del IR.
+function quitarReturnFinal(pasos) {
+  const ultimo = pasos[pasos.length - 1]
+  if (ultimo?.type === 'devolver' && (ultimo.valor == null || ultimo.valor === '0')) {
+    return pasos.slice(0, -1)
+  }
+  return pasos
+}
+
 class ParserContext {
-  constructor() {
-    this.i = 0
-    this.src = ''
+  constructor(avisos = []) {
+    this.avisos = avisos
+    this.nombresFunciones = new Set()
     this.tabla = {}
+  }
+
+  avisar(msg) {
+    this.avisos.push(msg)
   }
 }
 
@@ -213,17 +281,84 @@ function limpiarComentariosEInclude(source) {
   return s
 }
 
-function extraerCuerpoMain(s) {
-  // Busca "int main" y retorna el contenido de sus llaves.
-  const idx = s.search(/\bmain\s*\(/)
-  if (idx === -1) return s
-  let i = idx + 4
-  // saltar hasta la primera '{'
-  while (i < s.length && s[i] !== '{') i++
-  if (i >= s.length) throw new Error('No se encontró el bloque de main { ... }')
-  const abrir = s.indexOf('{', i)
-  const { cierre } = matchingBrace(s, abrir)
-  return s.slice(abrir + 1, cierre)
+// Parte el fuente a profundidad 0. Cada definición `<tipo> <nombre>(<params>){...}`
+// se convierte en un registro de función y `main` aporta el cuerpo del programa.
+function partirTopLevel(s, avisos) {
+  const funciones = []
+  let cuerpoMain = null
+  let i = 0
+  while (i < s.length) {
+    if (/\s/.test(s[i]) || s[i] === ';' || s[i] === '}') {
+      i++
+      continue
+    }
+    const cab = leerCabeceraTopLevel(s, i)
+    if (cab) {
+      if (cab.cuerpo == null) {
+        i = cab.fin // prototipo: se ignora
+      } else {
+        if (cab.nombre === 'main') cuerpoMain = cab.cuerpo
+        else funciones.push(cab)
+        i = cab.fin
+      }
+      continue
+    }
+    // Cualquier otra cosa a nivel superior (using, namespace, typedef, struct...)
+    // no tiene representación en el IR: se descarta y se avisa.
+    const trozo = s.slice(i)
+    const hasta = trozo.indexOf(';')
+    const texto = (hasta === -1 ? trozo : trozo.slice(0, hasta)).trim()
+    if (texto) avisos.push(`Se ignoró el código de nivel superior "${primeraLinea(texto)}".`)
+    i = hasta === -1 ? s.length : i + hasta + 1
+  }
+  if (cuerpoMain == null && funciones.length === 0) {
+    throw new Error('No se encontró ninguna función main ni ninguna función definida.')
+  }
+  return { funciones, cuerpoMain }
+}
+
+function primeraLinea(texto) {
+  const l = texto.split('\n')[0].trim()
+  return l.length > 60 ? `${l.slice(0, 60)}...` : l
+}
+
+// Desde `i` lee un encabezado de función a nivel superior.
+// Devuelve { tipo, nombre, params, cuerpo, fin } para una definición con cuerpo,
+// { tipo, nombre, params, cuerpo: null, fin } para un prototipo, o null si no
+// parece una función.
+function leerCabeceraTopLevel(s, i) {
+  const m = /^\s*(int|float|double|char|bool|void)\b/.exec(s.slice(i))
+  if (!m) return null
+  const tipo = m[1]
+  const tras = i + m[0].length
+  const mNombre = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?=[(<])/.exec(s.slice(tras))
+  if (!mNombre) return null
+  const nombre = mNombre[1]
+  const iniParams = tras + mNombre[0].length
+  if (s[iniParams] !== '(') return null
+  const finParams = buscarCierre(s, iniParams, '(', ')')
+  if (finParams === -1) return null
+  const params = s.slice(iniParams + 1, finParams)
+  let f = finParams + 1
+  while (f < s.length && /\s/.test(s[f])) f++
+  if (s[f] === ';') {
+    return { tipo, nombre, params, cuerpo: null, fin: f + 1 }
+  }
+  if (s[f] !== '{') return null
+  const { cierre } = matchingBrace(s, f)
+  return { tipo, nombre, params, cuerpo: s.slice(f + 1, cierre), fin: cierre + 1 }
+}
+
+function buscarCierre(s, desde, abre, cierra) {
+  let depth = 0
+  for (let i = desde; i < s.length; i++) {
+    if (s[i] === abre) depth++
+    else if (s[i] === cierra) {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+  return -1
 }
 
 function matchingBrace(s, openIdx) {
@@ -291,9 +426,14 @@ class Cursor {
   }
 }
 
-function parsearPasos(cuerpo, ctx) {
+// Normaliza lo que devuelve leerSentencia: un paso, varios o ninguno.
+function aPasos(x) {
+  if (x == null) return []
+  return Array.isArray(x) ? x : [x]
+}
+
+function leerPasos(cuerpo, ctx) {
   const cursor = new Cursor(cuerpo)
-  cursor.i = 0
   return leerBloque(cursor, ctx)
 }
 
@@ -314,8 +454,7 @@ function leerBloque(cursor, ctx) {
       cursor.consumir('}')
       continue
     }
-    const paso = leerSentencia(cursor, ctx)
-    if (paso) pasos.push(paso)
+    pasos.push(...aPasos(leerSentencia(cursor, ctx)))
   }
   return pasos
 }
@@ -344,23 +483,30 @@ function leerSentencia(cursor, ctx) {
       cursor.consumir(';')
       return { type: 'continue' }
     case 'return':
-      saltearHastaSemicolon(cursor)
-      return null
+      return leerReturn(cursor)
     case 'int':
     case 'float':
     case 'double':
     case 'char':
+    case 'bool':
       return leerDeclaracion(cursor, ctx, palabra)
     case 'printf':
       return leerPrintf(cursor)
     case 'scanf':
       return leerScanf(cursor)
     default:
-      // intentar: identificador = expr; o palabra desconocida
-      if (esIdentificador(palabra) && esAsignacion(cursor)) {
-        return leerAsignacion(cursor, ctx, palabra)
+      if (!esIdentificador(palabra)) {
+        // palabra reservada desconocida (p.ej. void, static) -> saltar hasta ';'
+        saltearHastaSemicolon(cursor)
+        return null
       }
-      // palabra desconocida (ej. std::cout, void) -> saltar hasta ';'
+      if (esLlamada(cursor)) return leerLlamada(cursor, ctx, palabra)
+      if (esAsignacion(cursor)) return leerAsignacion(cursor, ctx, palabra)
+      if (ctx.nombresFunciones.has(palabra)) {
+        ctx.avisar(`La función "${palabra}" se usó sin paréntesis y se descartó.`)
+      } else {
+        ctx.avisar(`Se descartó la instrucción desconocida "${palabra} ...".`)
+      }
       saltearHastaSemicolon(cursor)
       return null
   }
@@ -378,13 +524,16 @@ function esAsignacion(cursor) {
   return esIgual
 }
 
-function saltearHastaSemicolon(cursor) {
-  while (!cursor.eof() && cursor.peek() !== ';') cursor.i++
-  if (!cursor.eof()) cursor.i++
+function esLlamada(cursor) {
+  const guard = cursor.i
+  cursor.espacio()
+  const esParen = cursor.src[cursor.i] === '('
+  cursor.i = guard
+  return esParen
 }
 
-function saltearHasta(cursor, char) {
-  while (!cursor.eof() && cursor.src[cursor.i] !== char) cursor.i++
+function saltearHastaSemicolon(cursor) {
+  while (!cursor.eof() && cursor.peek() !== ';') cursor.i++
   if (!cursor.eof()) cursor.i++
 }
 
@@ -489,8 +638,7 @@ function leerCuerpoSwitch(cursor, ctx) {
       cursor.i++
       continue
     }
-    const paso = leerSentencia(cursor, ctx)
-    if (paso) pasos.push(paso)
+    pasos.push(...aPasos(leerSentencia(cursor, ctx)))
   }
   return pasos
 }
@@ -549,42 +697,97 @@ function leerCuerpoObligatorio(cursor, ctx) {
     return pasos
   }
   // un solo statement sin llaves
-  const paso = leerSentencia(cursor, ctx)
-  return paso ? [paso] : []
+  return aPasos(leerSentencia(cursor, ctx))
 }
 
+// "int num, a = 5, b = 7;" -> tres nodos declarar
 function leerDeclaracion(cursor, ctx, tipoCpp) {
-  const nombre = cursor.palabra()
-  if (!nombre) throw new Error('Declaración sin nombre de variable')
-  let tipo = tipoDesdeCpp(tipoCpp)
-  cursor.espacio()
-  if (cursor.peek() === '[') {
-    // char nombre[100] -> cadena
-    saltearHasta(cursor, ']')
-    tipo = TIPOS.STRING
+  const declaradores = leerHasta(cursor, ';')
+  cursor.consumir(';')
+  const pasos = []
+  for (const d of dividirArgs(declaradores)) {
+    const paso = leerDeclarador(d, tipoDesdeCpp(tipoCpp), ctx)
+    if (paso) pasos.push(paso)
   }
-  let valor
-  cursor.espacio()
-  if (cursor.peek() === '=') {
-    cursor.i++
-    cursor.espacio()
-    // leer valor hasta ';' o ','
-    const v = leerHasta(cursor, ';')
-    cursor.consumir(';')
-    valor = v.trim()
-    ctx.tabla[nombre] = tipo
-    return { type: 'declarar', nombre, tipo, valor }
+  return pasos
+}
+
+function leerDeclarador(texto, tipo, ctx) {
+  let t = texto.trim()
+  if (!t) return null
+  let tipoFinal = tipo
+  if (/\[[^\]]*\]/.test(t)) {
+    tipoFinal = TIPOS.STRING
+    t = t.replace(/\[[^\]]*\]/g, '')
   }
-  // puede ser "int x, y;" -> solo tomamos la primera por simplicidad
-  saltearHastaSemicolon(cursor)
-  ctx.tabla[nombre] = tipo
-  return { type: 'declarar', nombre, tipo, valor: null }
+  const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*(?:=\s*([\s\S]+))?$/.exec(t.trim())
+  if (!m) return null
+  const nombre = m[1]
+  const valor = m[2] != null ? m[2].trim() : null
+  ctx.tabla[nombre] = tipoFinal
+  return { type: 'declarar', nombre, tipo: tipoFinal, valor }
+}
+
+// "int n, bool primo, int &a" -> [parametro(...), ...]
+function leerParametros(texto, ctx) {
+  const params = []
+  for (const bruto of dividirArgs(texto)) {
+    const t = bruto.trim()
+    if (!t) continue
+    const referencia = t.includes('&')
+    const sinAmp = t.replace(/&/g, ' ').trim().replace(/\s+/g, ' ')
+    const esCadena = /\[[^\]]*\]\s*$/.test(sinAmp)
+    const limpio = sinAmp.replace(/\[[^\]]*\]/g, '').trim()
+    const mTipado =
+      /^(?:(?:unsigned|signed|long|short)\s+)*(int|float|double|char|bool|string|void)\s+([A-Za-z_][A-Za-z0-9_]*)$/i.exec(
+        limpio,
+      )
+    const mSimple = /^([A-Za-z_][A-Za-z0-9_]*)$/.exec(limpio)
+    let nombre
+    let tipo
+    if (mTipado) {
+      nombre = mTipado[2]
+      tipo = tipoDesdeCpp(mTipado[1])
+    } else if (mSimple) {
+      nombre = mSimple[1]
+      tipo = TIPOS.INT
+    } else {
+      ctx.avisar(`Se ignoró el parámetro no reconocido "${t}".`)
+      continue
+    }
+    if (esCadena) tipo = TIPOS.STRING
+    params.push(parametro(nombre, tipo, referencia))
+  }
+  return params
+}
+
+function dividirArgs(texto) {
+  const out = []
+  let depth = 0
+  let actual = ''
+  for (const c of texto) {
+    if (c === '(' || c === '[') depth++
+    else if (c === ')' || c === ']') depth--
+    if (c === ',' && depth === 0) {
+      out.push(actual)
+      actual = ''
+      continue
+    }
+    actual += c
+  }
+  out.push(actual)
+  return out
 }
 
 function tipoDesdeCpp(t) {
   if (t === 'float' || t === 'double') return TIPOS.FLOAT
   if (t === 'char') return TIPOS.CHAR
+  if (t === 'bool') return TIPOS.BOOL
   return TIPOS.INT
+}
+
+function retornoDesdeCpp(t) {
+  return t === 'void' ? RETORNO_VOID : tipoDesdeCpp(t)
 }
 
 function leerAsignacion(cursor, ctx, nombre) {
@@ -592,6 +795,27 @@ function leerAsignacion(cursor, ctx, nombre) {
   const valor = leerHasta(cursor, ';').trim()
   cursor.consumir(';')
   return { type: 'asignar', nombre, valor }
+}
+
+function leerReturn(cursor) {
+  cursor.espacio()
+  if (cursor.consumir(';')) return { type: 'devolver', valor: null }
+  const valor = leerHasta(cursor, ';').trim()
+  cursor.consumir(';')
+  return { type: 'devolver', valor: valor || null }
+}
+
+function leerLlamada(cursor, ctx, nombre) {
+  cursor.consumir('(')
+  const argumentos = leerArgumentos(cursor)
+  cursor.consumir(';')
+  if (!ctx.nombresFunciones.has(nombre)) {
+    ctx.avisar(
+      `La llamada a "${nombre}" se descartó porque no hay ninguna función con ese nombre en el programa.`,
+    )
+    return null
+  }
+  return { type: 'llamar', nombre, argumentos }
 }
 
 function leerPrintf(cursor) {
@@ -606,6 +830,7 @@ function leerArgumentos(cursor) {
   const args = []
   while (true) {
     cursor.espacio()
+    if (cursor.eof()) throw new Error('Faltan paréntesis de cierre ")"')
     if (cursor.peek() === ')') {
       cursor.i++
       break
@@ -617,6 +842,7 @@ function leerArgumentos(cursor) {
     const arg = leerHasta(cursor, [',', ')'])
     args.push(arg.trim())
     cursor.espacio()
+    if (cursor.eof()) throw new Error('Faltan paréntesis de cierre ")"')
     if (cursor.peek() === ')') {
       cursor.i++
       break
@@ -627,7 +853,7 @@ function leerArgumentos(cursor) {
     }
     throw new Error('Se esperaba , o ) tras un argumento')
   }
-  return args
+  return args.filter((a) => a !== '')
 }
 
 function leerStringLiteral(cursor) {
@@ -719,11 +945,15 @@ function partesFiltradas(partes) {
 }
 
 function quitarSaltoFinal(partes) {
-  // quitar el \n final que agrega el generador
+  // Quita el salto final que agrega el generador. Los espacios que lo preceden
+  // también se van: de otro modo el formato vuelve con " " en vez de "\n".
   const ultimoParte = partes[partes.length - 1]
-  if (ultimoParte && ultimoParte.tipo === 'texto' && ultimoParte.valor.endsWith('\n')) {
-    ultimoParte.valor = ultimoParte.valor.slice(0, -1)
-    if (ultimoParte.valor === '') partes.pop()
+  if (ultimoParte && ultimoParte.tipo === 'texto') {
+    const recortado = ultimoParte.valor.replace(/ *\n$/, '')
+    if (recortado !== ultimoParte.valor) {
+      if (recortado === '') partes.pop()
+      else ultimoParte.valor = recortado
+    }
   }
   return { type: 'mostrar', partes }
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRightLeft, Languages, ListChecks, Workflow, Braces, Loader2, TriangleAlert } from 'lucide-react'
+import { ArrowRightLeft, Languages, ListChecks, Workflow, Braces, Loader2, TriangleAlert, Info } from 'lucide-react'
 import { naturalDesdePrograma, irDesdeNatural } from '../engine/natural.js'
 import { pseudoDesdePrograma, irDesdePseudo } from '../engine/pseudocode.js'
 import { cppDesdePrograma, irDesdeCPP } from '../engine/cpp.js'
@@ -11,7 +11,16 @@ import FlowCanvas from '../components/flow/FlowCanvas.jsx'
 import CodeBlock from '../components/common/CodeBlock.jsx'
 
 function FlowCanvasSimple({ nodes, edges }) {
-  return <FlowCanvas nodes={nodes} edges={edges} editable={false} minHeight={Math.max(380, Math.min(altoDelFlujo(nodes) + 90, 1100))} />
+  const fitKey = useMemo(() => nodes.map((n) => n.id).join('|'), [nodes])
+  return (
+    <FlowCanvas
+      nodes={nodes}
+      edges={edges}
+      editable={false}
+      minHeight={Math.max(380, Math.min(altoDelFlujo(nodes) + 90, 1100))}
+      fitKey={fitKey}
+    />
+  )
 }
 
 const FUENTES = [
@@ -36,7 +45,12 @@ export default function Converter() {
 
   const cargarEjemplo = (ej) => {
     if (fuente === 'flujo') {
-      setFlujo(flujoDesdePrograma(ej.programa))
+      try {
+        setFlujo(flujoDesdePrograma(ej.programa))
+      } catch (e) {
+        setResultado({ ok: false, error: String(e?.message ?? e) })
+        return
+      }
     } else {
       setTexto(
         fuente === 'natural'
@@ -53,6 +67,7 @@ export default function Converter() {
     if (destino === fuente) return
     let ir = null
     let error = null
+    let avisos = []
     if (fuente === 'flujo') {
       const r = programaDesdeFlujo(flujo.nodes, flujo.edges)
       if (!r.ok) error = r.error
@@ -62,13 +77,19 @@ export default function Converter() {
         fuente === 'natural' ? irDesdeNatural(texto) : fuente === 'pseudo' ? irDesdePseudo(texto) : irDesdeCPP(texto)
       if (!r.ok) error = r.error
       else ir = r.programa
+      avisos = r.avisos ?? []
     }
     if (error) {
-      setResultado({ ok: false, error })
+      setResultado({ ok: false, error, avisos })
       return
     }
     if (destino === 'flujo') {
-      setFlujo(flujoDesdePrograma(ir))
+      try {
+        setFlujo(flujoDesdePrograma(ir))
+      } catch (e) {
+        setResultado({ ok: false, error: String(e?.message ?? e) })
+        return
+      }
     } else if (destino === 'natural') {
       setTexto(naturalDesdePrograma(ir))
     } else if (destino === 'pseudo') {
@@ -88,6 +109,8 @@ export default function Converter() {
       try {
         let ir = null
         let error = null
+        let avisos = []
+        let flujoError = null
         if (fuente === 'natural') {
           const r = irDesdeNatural(texto)
           if (!r.ok) error = r.error
@@ -100,13 +123,14 @@ export default function Converter() {
           const r = irDesdeCPP(texto)
           if (!r.ok) error = r.error
           else ir = r.programa
+          avisos = r.avisos ?? []
         } else {
           const r = programaDesdeFlujo(flujo.nodes, flujo.edges)
           if (!r.ok) error = r.error
           else ir = r.programa
         }
         if (error) {
-          setResultado({ ok: false, error })
+          setResultado({ ok: false, error, avisos })
         } else {
           const reps = {}
           if (fuente !== 'natural') reps.natural = naturalDesdePrograma(ir)
@@ -114,12 +138,14 @@ export default function Converter() {
           if (fuente !== 'flujo') {
             try {
               reps.flujo = flujoDesdePrograma(ir)
-            } catch {
-              reps.flujo = null
+            } catch (e) {
+              // Si el diagrama no se puede dibujar, se dice por qué en vez de
+              // mostrar un lienzo vacío sin explicación.
+              flujoError = String(e?.message ?? e)
             }
           }
           if (fuente !== 'cpp') reps.cpp = cppDesdePrograma(ir)
-          setResultado({ ok: true, reps })
+          setResultado({ ok: true, reps, avisos, flujoError })
         }
       } catch (e) {
         setResultado({ ok: false, error: String(e?.message ?? e) })
@@ -214,6 +240,33 @@ export default function Converter() {
       </div>
 
       {/* resultados */}
+      {/* avisos de una conversión parcial */}
+      {resultado?.avisos?.length > 0 && (
+        <div className="mt-6 rounded-xl border border-neon-amber/40 bg-neon-amber/5 p-4">
+          <div className="mb-1 flex items-center gap-2 text-sm font-bold text-neon-amber">
+            <Info size={16} />
+            La conversión se hizo, pero hubo que descartar algo
+          </div>
+          <ul className="list-inside list-disc font-mono text-[13px] leading-6 text-neon-amber/90">
+            {resultado.avisos.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {resultado?.flujoError && (
+        <div className="mt-6 rounded-xl border border-neon-amber/40 bg-neon-amber/5 p-4">
+          <div className="mb-1 flex items-center gap-2 text-sm font-bold text-neon-amber">
+            <TriangleAlert size={16} />
+            No se pudo dibujar el diagrama de este algoritmo
+          </div>
+          <pre className="whitespace-pre-wrap font-mono text-[13px] leading-6 text-neon-amber/90">
+            {resultado.flujoError}
+          </pre>
+        </div>
+      )}
+
       {resultado && !resultado.ok && (
         <div className="mt-6 rounded-xl border border-neon-red/40 bg-neon-red/5 p-4">
           <div className="mb-1 flex items-center gap-2 text-sm font-bold text-neon-red">

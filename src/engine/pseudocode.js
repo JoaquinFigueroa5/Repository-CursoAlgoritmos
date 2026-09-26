@@ -2,13 +2,15 @@
 // pseudocode.js — generador y parser de pseudocódigo (español)
 // ============================================================
 
-import { programaDesde } from './ir.js'
+import { programaDesde, parametro } from './ir.js'
 import {
   normalizarLinea,
   partesDesdeCadena,
   partesAString,
   tipoNombre,
   tipoDesdeNombre,
+  retornoDesdeNombre,
+  desescaparPartes,
 } from './textutils.js'
 
 // ---------------- generador ----------------
@@ -25,6 +27,24 @@ function pseudoDesdePasos(pasos, nivel) {
   for (const paso of pasos) {
     lineas.push(...pseudoDesdePaso(paso, nivel, sangria))
   }
+  return lineas
+}
+
+// Los parámetros se escriben "nombre: tipo" y los por referencia con "por referencia".
+function paramTexto(p) {
+  return `${p.nombre}${p.referencia ? ' por referencia' : ''}: ${tipoNombre(p.tipo)}`
+}
+
+export function parametrosAString(parametros) {
+  return parametros.length ? parametros.map(paramTexto).join(', ') : 'nada'
+}
+
+function funcionPseudo(paso, nivel, sangria) {
+  const params = parametrosAString(paso.parametros)
+  const retorno = paso.retorno === 'void' ? 'nada' : tipoNombre(paso.retorno)
+  const lineas = [`${sangria}Funcion ${paso.nombre} (${params}): ${retorno}`]
+  lineas.push(...pseudoDesdePasos(paso.cuerpo, nivel + 1))
+  lineas.push(`${sangria}Fin Funcion`)
   return lineas
 }
 
@@ -57,6 +77,12 @@ function pseudoDesdePaso(paso, nivel, sangria) {
       return [`${sangria}Salir del ciclo`]
     case 'continue':
       return [`${sangria}Continuar`]
+    case 'llamar':
+      return [`${sangria}Llamar ${paso.nombre}(${paso.argumentos.join(', ')})`]
+    case 'devolver':
+      return [`${sangria}Devolver ${paso.valor == null ? 'nada' : paso.valor}`]
+    case 'funcion':
+      return funcionPseudo(paso, nivel, sangria)
     default:
       return []
   }
@@ -173,6 +199,7 @@ function esFinDeBloque(linea) {
     baja === 'sino' ||
     /^de\s+otro\s+modo:?$/.test(baja) ||
     /^caso\s+/i.test(baja) ||
+    /^fin\s+funci[óo]n\.?$/.test(baja) ||
     baja.startsWith('mientras que')
   )
 }
@@ -198,9 +225,20 @@ function parsearLinea(ctx, linea) {
     ctx.i++
     return null
   }
+  if (/^fin\s+funci[óo]n\.?$/i.test(baja)) {
+    ctx.i++
+    return null
+  }
   if (baja.startsWith('mientras que')) {
     ctx.i++
     return null
+  }
+  if (/^funci[óo]n\s+/i.test(baja)) {
+    const cab = parsearCabeceraFuncion(linea)
+    ctx.i++
+    const cuerpo = parsearBloque(ctx)
+    if (hayLinea(ctx) && /^fin\s+funci[óo]n\.?$/i.test(lineaActual(ctx).toLowerCase())) ctx.i++
+    return { type: 'funcion', ...cab, cuerpo }
   }
   if (baja.startsWith('si ') && baja.includes('entonces')) {
     const cond = extraerCondicion(linea)
@@ -260,7 +298,22 @@ function parsearLinea(ctx, linea) {
   if (baja.startsWith('escribir ')) {
     ctx.i++
     const contenido = linea.slice('Escribir'.length).trim()
-    return { type: 'mostrar', partes: partesDesdeCadena(contenido) }
+    return { type: 'mostrar', partes: desescaparPartes(partesDesdeCadena(contenido)) }
+  }
+  const llamar = /^llamar\s+([A-Za-z_]\w*)\s*\((.*)\)$/i.exec(linea)
+  if (llamar) {
+    ctx.i++
+    const argumentos = llamar[2].trim()
+    return {
+      type: 'llamar',
+      nombre: llamar[1],
+      argumentos: argumentos ? argumentos.split(',').map((a) => a.trim()).filter(Boolean) : [],
+    }
+  }
+  if (baja.startsWith('devolver')) {
+    ctx.i++
+    const valor = linea.slice('Devolver'.length).trim()
+    return { type: 'devolver', valor: !valor || /^nada$/i.test(valor) ? null : valor }
   }
   if (baja.startsWith('leer ')) {
     ctx.i++
@@ -278,6 +331,25 @@ function parsearLinea(ctx, linea) {
     }
   }
   throw new Error(`No se reconoce la instrucción: "${linea}"`)
+}
+
+// "Funcion esPrimo (n: entero, a por referencia: real): booleano"
+function parsearCabeceraFuncion(linea) {
+  const m = /^funci[óo]n\s+([A-Za-z_]\w*)\s*\((.*)\)\s*:\s*(.+)$/i.exec(linea)
+  if (!m) throw new Error(`Cabecera de función no válida: "${linea}"`)
+  const [, nombre, listaParams, retorno] = m
+  const trimmed = listaParams.trim()
+  const parametros = !trimmed || /^nada$/i.test(trimmed)
+    ? []
+    : trimmed.split(',').map((p) => p.trim()).filter(Boolean).map(parsearParametro)
+  return { nombre, retorno: retornoDesdeNombre(retorno.trim()), parametros }
+}
+
+// "n: entero" | "a por referencia: real"
+function parsearParametro(texto) {
+  const m = /^([A-Za-z_]\w*)\s*(por\s+referencia)?\s*:\s*(.+)$/i.exec(texto)
+  if (!m) throw new Error(`Parámetro no válido: "${texto}"`)
+  return parametro(m[1], tipoDesdeNombre(m[3].trim()), Boolean(m[2]))
 }
 
 function extraerCondicion(linea) {

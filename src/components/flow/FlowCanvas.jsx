@@ -1,10 +1,11 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
   MarkerType,
+  useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nodeTypes } from './nodeTypes.jsx'
@@ -17,6 +18,18 @@ const defaultEdgeOptions = {
   markerEnd: { type: MarkerType.ArrowClosed, color: COLOR_ARROW },
 }
 
+// Reencuadra cuando cambia la clave (por ejemplo, al regenerar el diagrama) sin
+// reaccionar a mover los nodos, para no interrumpir al usuario mientras arrastra.
+function Reencuadrar({ fitKey }) {
+  const { fitView } = useReactFlow()
+  useEffect(() => {
+    if (fitKey == null) return
+    const t = setTimeout(() => fitView({ padding: 0.2 }), 0)
+    return () => clearTimeout(t)
+  }, [fitKey, fitView])
+  return null
+}
+
 export default function FlowCanvas({
   nodes,
   edges,
@@ -27,6 +40,7 @@ export default function FlowCanvas({
   onNodeDoubleClick,
   minHeight = 380,
   fitView = true,
+  fitKey,
 }) {
   const handleNodesChange = useCallback(
     (changes) => {
@@ -89,6 +103,7 @@ export default function FlowCanvas({
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="#1b2331" />
         <Controls showInteractive={false} className="bg-night-900! border! border-night-700!" />
+        <Reencuadrar fitKey={fitKey} />
       </ReactFlow>
     </div>
   )
